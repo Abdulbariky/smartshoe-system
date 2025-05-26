@@ -39,7 +39,7 @@ export default function ProductsPage() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  
+
   // Pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -48,7 +48,7 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       setError('');
-      
+
       // Use mock data for now (replace with real API call)
       const mockProducts: Product[] = [
         {
@@ -122,7 +122,7 @@ export default function ProductsPage() {
           current_stock: 25,
         },
       ];
-      
+
       setProducts(mockProducts);
       setFilteredProducts(mockProducts);
     } catch (err: any) {
@@ -250,9 +250,9 @@ export default function ProductsPage() {
                     <TableCell>{product.category}</TableCell>
                     <TableCell>{product.size}</TableCell>
                     <TableCell>{product.color}</TableCell>
-                    <TableCell align="right">${product.purchase_price}</TableCell>
-                    <TableCell align="right">${product.retail_price}</TableCell>
-                    <TableCell align="right">${product.wholesale_price}</TableCell>
+                    <TableCell align="right">KES {product.purchase_price}</TableCell>
+                    <TableCell align="right">KES {product.retail_price}</TableCell>
+                    <TableCell align="right">KES {product.wholesale_price}</TableCell>
                     <TableCell align="center">
                       <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
                         <Typography>{product.current_stock}</Typography>
@@ -265,8 +265,8 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell align="center">
                       <Tooltip title="Edit">
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           color="primary"
                           onClick={() => handleEditProduct(product)}
                         >
@@ -279,8 +279,8 @@ export default function ProductsPage() {
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Delete">
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           color="error"
                           onClick={() => handleDeleteProduct(product.id)}
                         >
