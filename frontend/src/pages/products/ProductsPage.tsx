@@ -25,6 +25,7 @@ import {
   Inventory,
 } from '@mui/icons-material';
 import type { Product } from '../../services/productService';
+import { productService } from '../../services/productService'; // ✅ Correct for named export
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorAlert from '../../components/common/ErrorAlert';
 import AddProductDialog from '../../components/products/AddProductDialog';
@@ -44,89 +45,17 @@ export default function ProductsPage() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Fetch products from API
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setError('');
 
-      // Use mock data for now (replace with real API call)
-      const mockProducts: Product[] = [
-        {
-          id: 1,
-          name: 'Nike Air Max',
-          category: 'Sneakers',
-          brand: 'Nike',
-          size: '42',
-          color: 'White',
-          purchase_price: 80,
-          retail_price: 120,
-          wholesale_price: 100,
-          supplier: 'Nike Store',
-          sku: 'NK-SNK-001',
-          current_stock: 45,
-        },
-        {
-          id: 2,
-          name: 'Adidas Ultraboost',
-          category: 'Running',
-          brand: 'Adidas',
-          size: '43',
-          color: 'Black',
-          purchase_price: 90,
-          retail_price: 140,
-          wholesale_price: 120,
-          supplier: 'Adidas Official',
-          sku: 'AD-RUN-001',
-          current_stock: 30,
-        },
-        {
-          id: 3,
-          name: 'Puma Suede Classic',
-          category: 'Casual',
-          brand: 'Puma',
-          size: '41',
-          color: 'Blue',
-          purchase_price: 60,
-          retail_price: 95,
-          wholesale_price: 80,
-          supplier: 'Puma Distributor',
-          sku: 'PM-CAS-001',
-          current_stock: 8,
-        },
-        {
-          id: 4,
-          name: 'Clarks Desert Boot',
-          category: 'Formal',
-          brand: 'Clarks',
-          size: '44',
-          color: 'Brown',
-          purchase_price: 100,
-          retail_price: 180,
-          wholesale_price: 150,
-          supplier: 'Clarks Direct',
-          sku: 'CL-FOR-001',
-          current_stock: 12,
-        },
-        {
-          id: 5,
-          name: 'Nike Revolution 6',
-          category: 'Running',
-          brand: 'Nike',
-          size: '40',
-          color: 'Gray',
-          purchase_price: 50,
-          retail_price: 75,
-          wholesale_price: 65,
-          supplier: 'Nike Store',
-          sku: 'NK-RUN-002',
-          current_stock: 25,
-        },
-      ];
-
-      setProducts(mockProducts);
-      setFilteredProducts(mockProducts);
+      const products = await productService.getAll();
+      setProducts(products);
+      setFilteredProducts(products);
     } catch (err: any) {
-      setError(err.message || 'Failed to load products');
+      setError(err.response?.data?.message || 'Failed to load products');
     } finally {
       setLoading(false);
     }
@@ -137,7 +66,6 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
-    // Filter products based on search term
     const filtered = products.filter(product =>
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -146,7 +74,7 @@ export default function ProductsPage() {
       product.color.toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredProducts(filtered);
-    setPage(0); // Reset to first page on search
+    setPage(0);
   }, [searchTerm, products]);
 
   const handleChangePage = (_: unknown, newPage: number) => {
@@ -163,22 +91,21 @@ export default function ProductsPage() {
     setEditDialogOpen(true);
   };
 
+  const handleDeleteProduct = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this product?')) {
+      try {
+        await productService.delete(id);
+        fetchProducts();
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Failed to delete product');
+      }
+    }
+  };
+
   const getStockStatus = (stock: number) => {
     if (stock === 0) return { label: 'Out of Stock', color: 'error' as const };
     if (stock < 10) return { label: 'Low Stock', color: 'warning' as const };
     return { label: 'In Stock', color: 'success' as const };
-  };
-
-  const handleDeleteProduct = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
-      try {
-        // Mock delete - in real app, call productService.delete(id)
-        setProducts(products.filter(p => p.id !== id));
-        setFilteredProducts(filteredProducts.filter(p => p.id !== id));
-      } catch (err: any) {
-        setError(err.message || 'Failed to delete product');
-      }
-    }
   };
 
   if (loading) return <LoadingSpinner message="Loading products..." />;

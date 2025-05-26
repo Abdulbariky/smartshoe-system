@@ -1,9 +1,7 @@
-import api from './api';
-
 export interface Category {
   id: number;
   name: string;
-  description?: string;
+  description: string;
 }
 
 export interface Brand {
@@ -11,42 +9,43 @@ export interface Brand {
   name: string;
 }
 
-export const categoryService = {
-  getCategories: async (): Promise<Category[]> => {
-    const response = await api.get('/categories');
-    return response.data.categories;
-  },
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
-  addCategory: async (category: Omit<Category, 'id'>): Promise<Category> => {
-    const response = await api.post('/categories', category);
-    return response.data.category;
-  },
+const BASE_URL = 'http://localhost:5000/api';
 
-  updateCategory: async (id: number, category: Partial<Category>): Promise<Category> => {
-    const response = await api.put(`/categories/${id}`, category);
-    return response.data.category;
-  },
+export const getCategories = async () => {
+  const res = await fetch(`${BASE_URL}/categories`, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
 
-  deleteCategory: async (id: number): Promise<void> => {
-    await api.delete(`/categories/${id}`);
-  },
+  if (!res.ok) throw new Error('Failed to load categories');
+  return res.json();
+};
 
-  getBrands: async (): Promise<Brand[]> => {
-    const response = await api.get('/brands');
-    return response.data.brands;
-  },
+export const addCategory = async (data: any) => {
+  const res = await fetch(`${BASE_URL}/categories`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
 
-  addBrand: async (brand: Omit<Brand, 'id'>): Promise<Brand> => {
-    const response = await api.post('/brands', brand);
-    return response.data.brand;
-  },
+  if (!res.ok) throw new Error('Failed to add category');
+  return res.json();
+};
 
-  updateBrand: async (id: number, brand: Partial<Brand>): Promise<Brand> => {
-    const response = await api.put(`/brands/${id}`, brand);
-    return response.data.brand;
-  },
+export const deleteCategory = async (id: number) => {
+  const res = await fetch(`${BASE_URL}/categories/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
 
-  deleteBrand: async (id: number): Promise<void> => {
-    await api.delete(`/brands/${id}`);
-  },
+  if (!res.ok) throw new Error('Failed to delete category');
+  return res.json();
 };

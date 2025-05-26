@@ -12,4 +12,4 @@ class InventoryItem(db.Model):
     notes = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    product = db.relationship('Product', backref='inventory_items')
+    product = db.relationship('Product', back_populates='inventory_items')

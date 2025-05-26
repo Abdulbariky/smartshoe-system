@@ -9,55 +9,124 @@ products_bp = Blueprint('products', __name__)
 @products_bp.route('/', methods=['GET'])
 @jwt_required()
 def list_products():
-    products = Product.query.all()
-    return jsonify({
-        'products': [product.to_dict() for product in products],
-        'count': len(products)
-    }), 200
+    try:
+        products = Product.query.order_by(Product.created_at.desc()).all()
+        return jsonify({
+            'success': True,
+            'products': [product.to_dict() for product in products],
+            'count': len(products)
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @products_bp.route('/', methods=['POST'])
 @jwt_required()
 def add_product():
-    data = request.get_json()
-    required_fields = ['name', 'category', 'size', 'color', 'purchase_price', 'retail_price', 'wholesale_price']
-    if not all(field in data for field in required_fields):
-        return jsonify({'message': 'Missing required fields'}), 400
-
-    sku = f"{data['name'][:3].upper()}-{data['category'][:3].upper()}-{uuid.uuid4().hex[:6].upper()}"
-
-    product = Product(
-        name=data['name'],
-        category=data['category'],
-        size=data['size'],
-        color=data['color'],
-        purchase_price=data['purchase_price'],
-        retail_price=data['retail_price'],
-        wholesale_price=data['wholesale_price'],
-        supplier=data.get('supplier', ''),
-        sku=sku
-    )
-
-    db.session.add(product)
-    db.session.commit()
-    return jsonify({'message': 'Product added successfully'}), 201
+    try:
+        data = request.get_json()
+        
+        required_fields = ['name', 'brand', 'category', 'size', 'color', 
+                          'purchase_price', 'retail_price', 'wholesale_price']
+        if not all(field in data for field in required_fields):
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+        
+        # Check if SKU already exists
+        if 'sku' in data and Product.query.filter_by(sku=data['sku']).first():
+            return jsonify({'success': False, 'message': 'SKU already exists'}), 400
+        
+        # Generate SKU if not provided
+        if 'sku' not in data or not data['sku']:
+            sku = f"{data['brand'][:2].upper()}-{data['category'][:3].upper()}-{uuid.uuid4().hex[:6].upper()}"
+            data['sku'] = sku
+        
+        product = Product(
+            name=data['name'],
+            brand=data['brand'],
+            category=data['category'],
+            size=data['size'],
+            color=data['color'],
+            purchase_price=float(data['purchase_price']),
+            retail_price=float(data['retail_price']),
+            wholesale_price=float(data['wholesale_price']),
+            supplier=data.get('supplier', ''),
+            sku=data['sku']
+        )
+        
+        db.session.add(product)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Product created successfully',
+            'product': product.to_dict()
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @products_bp.route('/<int:id>', methods=['PUT'])
 @jwt_required()
 def update_product(id):
-    product = Product.query.get_or_404(id)
-    data = request.get_json()
-
-    for field in ['name', 'category', 'size', 'color', 'purchase_price', 'retail_price', 'wholesale_price', 'supplier']:
-        if field in data:
-            setattr(product, field, data[field])
-
-    db.session.commit()
-    return jsonify({'message': 'Product updated successfully'}), 200
+    try:
+        product = Product.query.get(id)
+        if not product:
+            return jsonify({'success': False, 'message': 'Product not found'}), 404
+        
+        data = request.get_json()
+        
+        # Update fields if provided
+        if 'name' in data:
+            product.name = data['name']
+        if 'brand' in data:
+            product.brand = data['brand']
+        if 'category' in data:
+            product.category = data['category']
+        if 'size' in data:
+            product.size = data['size']
+        if 'color' in data:
+            product.color = data['color']
+        if 'purchase_price' in data:
+            product.purchase_price = float(data['purchase_price'])
+        if 'retail_price' in data:
+            product.retail_price = float(data['retail_price'])
+        if 'wholesale_price' in data:
+            product.wholesale_price = float(data['wholesale_price'])
+        if 'supplier' in data:
+            product.supplier = data['supplier']
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Product updated successfully',
+            'product': product.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @products_bp.route('/<int:id>', methods=['DELETE'])
 @jwt_required()
 def delete_product(id):
-    product = Product.query.get_or_404(id)
-    db.session.delete(product)
-    db.session.commit()
-    return jsonify({'message': 'Product deleted successfully'}), 200
+    try:
+        product = Product.query.get(id)
+        if not product:
+            return jsonify({'success': False, 'message': 'Product not found'}), 404
+        
+        # Check if product has inventory transactions
+        if product.get_current_stock() > 0:
+            return jsonify({
+                'success': False, 
+                'message': 'Cannot delete product with existing stock. Please clear inventory first.'
+            }), 400
+        
+        db.session.delete(product)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Product deleted successfully'
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500

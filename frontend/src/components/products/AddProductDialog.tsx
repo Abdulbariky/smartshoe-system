@@ -22,9 +22,21 @@ const schema = yup.object({
   brand: yup.string().required('Brand is required'),
   size: yup.string().required('Size is required'),
   color: yup.string().required('Color is required'),
-  purchase_price: yup.number().positive('Must be positive').required('Purchase price is required'),
-  retail_price: yup.number().positive('Must be positive').required('Retail price is required'),
-  wholesale_price: yup.number().positive('Must be positive').required('Wholesale price is required'),
+  purchase_price: yup
+    .number()
+    .typeError('Purchase price must be a number')
+    .positive('Must be positive')
+    .required('Purchase price is required'),
+  retail_price: yup
+    .number()
+    .typeError('Retail price must be a number')
+    .positive('Must be positive')
+    .required('Retail price is required'),
+  wholesale_price: yup
+    .number()
+    .typeError('Wholesale price must be a number')
+    .positive('Must be positive')
+    .required('Wholesale price is required'),
   supplier: yup.string().required('Supplier is required'),
 });
 
@@ -55,7 +67,6 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
   });
 
   useEffect(() => {
-    // Load categories and brands when dialog opens
     if (open) {
       loadCategoriesAndBrands();
     }
@@ -63,7 +74,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
 
   const loadCategoriesAndBrands = async () => {
     try {
-      // Mock data for now
+      // Replace mock data with real API if available
       setCategories([
         { id: 1, name: 'Sneakers', description: 'Sports and casual sneakers' },
         { id: 2, name: 'Running', description: 'Professional running shoes' },
@@ -71,7 +82,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
         { id: 4, name: 'Casual', description: 'Everyday casual shoes' },
         { id: 5, name: 'Sandals', description: 'Open-toe sandals' },
       ]);
-      
+
       setBrands([
         { id: 1, name: 'Nike' },
         { id: 2, name: 'Adidas' },
@@ -88,9 +99,13 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
     try {
       setLoading(true);
       setError('');
-      await productService.create(data);
+
+      // ✅ Real API call to create product
+      await productService.add(data)
+
+
       reset();
-      onSuccess();
+      onSuccess(); // Refresh list
       onClose();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to add product');
@@ -104,8 +119,12 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
       <form onSubmit={handleSubmit(onSubmit)}>
         <DialogTitle>Add New Product</DialogTitle>
         <DialogContent>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField
               fullWidth
@@ -114,7 +133,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
               error={!!errors.name}
               helperText={errors.name?.message}
             />
-            
+
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
                 fullWidth
@@ -132,7 +151,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                   </MenuItem>
                 ))}
               </TextField>
-              
+
               <TextField
                 fullWidth
                 select
@@ -150,7 +169,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 ))}
               </TextField>
             </Box>
-            
+
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
                 fullWidth
@@ -162,10 +181,12 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 helperText={errors.size?.message}
               >
                 {sizes.map((size) => (
-                  <MenuItem key={size} value={size}>{size}</MenuItem>
+                  <MenuItem key={size} value={size}>
+                    {size}
+                  </MenuItem>
                 ))}
               </TextField>
-              
+
               <TextField
                 fullWidth
                 select
@@ -176,11 +197,13 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 helperText={errors.color?.message}
               >
                 {colors.map((color) => (
-                  <MenuItem key={color} value={color}>{color}</MenuItem>
+                  <MenuItem key={color} value={color}>
+                    {color}
+                  </MenuItem>
                 ))}
               </TextField>
             </Box>
-            
+
             <TextField
               fullWidth
               label="Supplier"
@@ -188,7 +211,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
               error={!!errors.supplier}
               helperText={errors.supplier?.message}
             />
-            
+
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
                 fullWidth
@@ -198,7 +221,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 error={!!errors.purchase_price}
                 helperText={errors.purchase_price?.message}
               />
-              
+
               <TextField
                 fullWidth
                 type="number"
@@ -207,7 +230,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 error={!!errors.retail_price}
                 helperText={errors.retail_price?.message}
               />
-              
+
               <TextField
                 fullWidth
                 type="number"
@@ -219,7 +242,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
             </Box>
           </Box>
         </DialogContent>
-        
+
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>
           <Button type="submit" variant="contained" disabled={loading}>
