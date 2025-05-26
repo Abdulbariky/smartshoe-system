@@ -9,7 +9,6 @@ from routes.inventory import inventory_bp
 from routes.sales import sales_bp
 from routes.categories import categories_bp
 
-
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
