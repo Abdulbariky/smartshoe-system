@@ -211,7 +211,7 @@ export default function SalesHistory() {
                   <TableCell>{sale.items_count}</TableCell>
                   <TableCell align="right">
                     <Typography fontWeight="bold">
-                      ${sale.total_amount.toFixed(2)}
+                      KES {sale.total_amount.toFixed(2)}
                     </Typography>
                   </TableCell>
                   <TableCell>

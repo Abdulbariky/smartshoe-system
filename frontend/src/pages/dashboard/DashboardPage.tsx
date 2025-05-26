@@ -127,15 +127,15 @@ export default function DashboardPage() {
       </Box>
 
       {/* Stats Cards */}
-      <Box 
-        display="grid" 
-        gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" 
-        gap={3} 
+      <Box
+        display="grid"
+        gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))"
+        gap={3}
         mb={3}
       >
         <StatsCard
           title="Today's Sales"
-          value={`$${stats.todaySales.toLocaleString()}`}
+          value={`KES ${stats.todaySales.toLocaleString()}`}
           subtitle="12 transactions"
           icon={<AttachMoney sx={{ fontSize: 40 }} />}
           trend={{ value: 15, isPositive: true }}
@@ -157,7 +157,7 @@ export default function DashboardPage() {
         />
         <StatsCard
           title="Inventory Value"
-          value={`$${stats.inventoryValue.toLocaleString()}`}
+          value={`KES ${stats.inventoryValue.toLocaleString()}`}
           subtitle="Total stock value"
           icon={<ShoppingCart sx={{ fontSize: 40 }} />}
           color="info"
@@ -179,11 +179,11 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="day" />
                 <YAxis />
-                <Tooltip formatter={(value) => `$${value}`} />
-                <Line 
-                  type="monotone" 
-                  dataKey="sales" 
-                  stroke="#2563eb" 
+                <Tooltip formatter={(value) => `KES ${value}`} />
+                <Line
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="#2563eb"
                   strokeWidth={2}
                   dot={{ fill: '#2563eb' }}
                 />
@@ -200,11 +200,11 @@ export default function DashboardPage() {
             </Typography>
             <Box sx={{ mt: 2 }}>
               {lowStockProducts.map((product) => (
-                <Box 
-                  key={product.id} 
-                  sx={{ 
-                    p: 1.5, 
-                    mb: 1, 
+                <Box
+                  key={product.id}
+                  sx={{
+                    p: 1.5,
+                    mb: 1,
                     bgcolor: 'warning.light',
                     borderRadius: 1,
                     opacity: 0.9,
@@ -218,9 +218,9 @@ export default function DashboardPage() {
                   </Typography>
                 </Box>
               ))}
-              <Button 
-                size="small" 
-                fullWidth 
+              <Button
+                size="small"
+                fullWidth
                 sx={{ mt: 2 }}
                 variant="outlined"
                 color="warning"
@@ -254,7 +254,7 @@ export default function DashboardPage() {
                   <TableCell>{sale.invoice}</TableCell>
                   <TableCell>{sale.date}</TableCell>
                   <TableCell>{sale.customer}</TableCell>
-                  <TableCell align="right">${sale.amount}</TableCell>
+                  <TableCell align="right">KES {sale.amount}</TableCell>
                   <TableCell>
                     <Chip
                       label={sale.status}

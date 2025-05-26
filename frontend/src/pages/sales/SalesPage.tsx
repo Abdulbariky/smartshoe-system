@@ -119,7 +119,7 @@ export default function SalesPage() {
         current_stock: 8,
       },
     ];
-    
+
     setProducts(mockProducts);
   };
 
@@ -131,7 +131,7 @@ export default function SalesPage() {
     if (!selectedProduct) return;
 
     const existingItem = cart.find(item => item.product.id === selectedProduct.id);
-    
+
     if (existingItem) {
       // Update quantity if product already in cart
       updateQuantity(existingItem.product.id, existingItem.quantity + 1);
@@ -146,7 +146,7 @@ export default function SalesPage() {
       };
       setCart([...cart, newItem]);
     }
-    
+
     setSelectedProduct(null);
   };
 
@@ -186,7 +186,7 @@ export default function SalesPage() {
       const subtotal = calculateTotal();
       const tax = subtotal * 0.1; // 10% tax
       const total = subtotal + tax;
-      
+
       // Create invoice data
       const invoiceData = {
         invoice_number: `INV-${new Date().getFullYear()}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}-${Math.random().toString(36).substr(2, 3).toUpperCase()}`,
@@ -203,11 +203,11 @@ export default function SalesPage() {
         total,
         payment_method: 'cash',
       };
-      
+
       // Set invoice data and open dialog
       setCurrentInvoice(invoiceData);
       setInvoiceDialogOpen(true);
-      
+
       // Clear cart and show success
       setCart([]);
       setSuccess('Sale completed successfully!');
@@ -245,7 +245,7 @@ export default function SalesPage() {
             <Typography variant="h6" gutterBottom>
               Add Products
             </Typography>
-            
+
             <Box sx={{ mb: 2 }}>
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Sale Type
@@ -347,8 +347,8 @@ export default function SalesPage() {
                               </IconButton>
                             </Box>
                           </TableCell>
-                          <TableCell align="right">${item.unitPrice}</TableCell>
-                          <TableCell align="right">${item.subtotal}</TableCell>
+                          <TableCell align="right">KES {item.unitPrice}</TableCell>
+                          <TableCell align="right">KES {item.subtotal}</TableCell>
                           <TableCell align="center">
                             <IconButton
                               size="small"
@@ -369,7 +369,7 @@ export default function SalesPage() {
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="h6">Total</Typography>
                   <Typography variant="h5" fontWeight="bold">
-                    ${calculateTotal().toFixed(2)}
+                    KES {calculateTotal().toFixed(2)}
                   </Typography>
                 </Box>
 

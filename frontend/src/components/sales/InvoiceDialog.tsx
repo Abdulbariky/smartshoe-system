@@ -47,7 +47,7 @@ interface InvoiceDialogProps {
 
 export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDialogProps) {
   const componentRef = useRef<HTMLDivElement>(null);
-  
+
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
     documentTitle: `Invoice-${invoiceData?.invoice_number || 'Document'}`,
@@ -65,7 +65,7 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
           </Button>
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         <Box ref={componentRef} sx={{ p: 3, bgcolor: 'white' }}>
           {/* Invoice Header */}
@@ -123,8 +123,8 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
                   <TableRow key={index}>
                     <TableCell>{item.product_name}</TableCell>
                     <TableCell align="center">{item.quantity}</TableCell>
-                    <TableCell align="right">${item.unit_price.toFixed(2)}</TableCell>
-                    <TableCell align="right">${item.subtotal.toFixed(2)}</TableCell>
+                    <TableCell align="right">KES {item.unit_price.toFixed(2)}</TableCell>
+                    <TableCell align="right">KES {item.subtotal.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -136,17 +136,17 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
             <Box width={250}>
               <Box display="flex" justifyContent="space-between" mb={1}>
                 <Typography>Subtotal:</Typography>
-                <Typography>${invoiceData.subtotal.toFixed(2)}</Typography>
+                <Typography>KES {invoiceData.subtotal.toFixed(2)}</Typography>
               </Box>
               <Box display="flex" justifyContent="space-between" mb={1}>
                 <Typography>Tax (10%):</Typography>
-                <Typography>${invoiceData.tax.toFixed(2)}</Typography>
+                <Typography>KES {invoiceData.tax.toFixed(2)}</Typography>
               </Box>
               <Divider sx={{ my: 1 }} />
               <Box display="flex" justifyContent="space-between">
                 <Typography variant="h6">Total:</Typography>
                 <Typography variant="h6" fontWeight="bold">
-                  ${invoiceData.total.toFixed(2)}
+                  KES {invoiceData.total.toFixed(2)}
                 </Typography>
               </Box>
             </Box>
@@ -160,7 +160,7 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
           </Box>
         </Box>
       </DialogContent>
-      
+
       <DialogActions>
         <Button onClick={onClose} startIcon={<Close />}>
           Close

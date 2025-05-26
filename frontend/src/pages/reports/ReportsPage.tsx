@@ -139,7 +139,7 @@ export default function ReportsPage() {
                 Total Sales
               </Typography>
               <Typography variant="h4" fontWeight="bold">
-                $26,350
+                KES 26,350
               </Typography>
               <Typography variant="body2" color="success.main">
                 +12% from last week
@@ -165,7 +165,7 @@ export default function ReportsPage() {
                 Average Sale
               </Typography>
               <Typography variant="h4" fontWeight="bold">
-                $169
+                KES 169
               </Typography>
               <Typography variant="body2" color="error.main">
                 -3% from last week
@@ -181,7 +181,7 @@ export default function ReportsPage() {
                 87%
               </Typography>
               <Typography variant="body2" color="info.main">
-                $3,150 to target
+                KES 3,150 to target
               </Typography>
             </CardContent>
           </Card>
@@ -262,7 +262,7 @@ export default function ReportsPage() {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="sales" fill="#8884d8" name="Sales ($)" />
+                  <Bar dataKey="sales" fill="#8884d8" name="Sales (KES)" />
                   <Bar dataKey="units" fill="#82ca9d" name="Units Sold" />
                 </BarChart>
               </ResponsiveContainer>
@@ -291,21 +291,21 @@ export default function ReportsPage() {
                   <td style={{ padding: '12px' }}>Nike Air Max</td>
                   <td style={{ padding: '12px' }}>Nike</td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>45</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>$5,400</td>
+                  <td style={{ padding: '12px', textAlign: 'right' }}>KES 5,400</td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>15</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '12px' }}>Adidas Ultraboost</td>
                   <td style={{ padding: '12px' }}>Adidas</td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>38</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>$5,320</td>
+                  <td style={{ padding: '12px', textAlign: 'right' }}>KES 5,320</td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>22</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '12px' }}>Puma Suede Classic</td>
                   <td style={{ padding: '12px' }}>Puma</td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>28</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>$2,660</td>
+                  <td style={{ padding: '12px', textAlign: 'right' }}>KES 2,660</td>
                   <td style={{ padding: '12px', textAlign: 'right' }}>8</td>
                 </tr>
               </tbody>
@@ -323,7 +323,7 @@ export default function ReportsPage() {
                 Total Inventory Value
               </Typography>
               <Typography variant="h4" fontWeight="bold">
-                $125,000
+                KES 125,000
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Across 450 items
