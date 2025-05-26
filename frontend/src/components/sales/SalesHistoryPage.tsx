@@ -131,7 +131,7 @@ export default function SalesHistory() {
       credit: { label: 'Credit', color: 'warning' as const },
       bank_transfer: { label: 'Bank Transfer', color: 'info' as const },
     };
-    
+
     const { label, color } = config[method as keyof typeof config] || { label: method, color: 'default' as const };
     return <Chip label={label} color={color} size="small" />;
   };
@@ -158,7 +158,7 @@ export default function SalesHistory() {
               ),
             }}
           />
-          
+
           <LocalizationProvider dateAdapter={AdapterDateFns}>
             <DatePicker
               label="Filter by date"
