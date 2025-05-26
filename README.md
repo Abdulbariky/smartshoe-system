@@ -81,5 +81,5 @@ Track stock levels efficiently
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/smartshoe-system.git
+git clone https://github.com/Abdulbariky/smartshoe-system.git
 cd smartshoe-system
