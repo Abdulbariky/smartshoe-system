@@ -1,3 +1,4 @@
+// src/pages/inventory/InventoryPage.tsx
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -27,6 +28,8 @@ import {
   Refresh,
 } from '@mui/icons-material';
 import type { Product } from '../../services/productService';
+import { productService } from '../../services/productService';
+import { inventoryService, type InventoryTransaction, type StockInRequest } from '../../services/inventoryService';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorAlert from '../../components/common/ErrorAlert';
 
@@ -38,7 +41,6 @@ interface TabPanelProps {
 
 function TabPanel(props: TabPanelProps) {
   const { children, value, index, ...other } = props;
-
   return (
     <div
       role="tabpanel"
@@ -49,17 +51,6 @@ function TabPanel(props: TabPanelProps) {
       {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
     </div>
   );
-}
-
-interface InventoryTransaction {
-  id: number;
-  product_id: number;
-  product_name: string;
-  transaction_type: 'in' | 'out';
-  quantity: number;
-  batch_number?: string;
-  notes?: string;
-  created_at: string;
 }
 
 export default function InventoryPage() {
@@ -75,6 +66,7 @@ export default function InventoryPage() {
   const [quantity, setQuantity] = useState<number>(0);
   const [batchNumber, setBatchNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -85,72 +77,13 @@ export default function InventoryPage() {
       setLoading(true);
       setError('');
       
-      // Mock data
-      const mockProducts: Product[] = [
-        {
-          id: 1,
-          name: 'Nike Air Max',
-          category: 'Sneakers',
-          brand: 'Nike',
-          size: '42',
-          color: 'White',
-          purchase_price: 80,
-          retail_price: 120,
-          wholesale_price: 100,
-          supplier: 'Nike Store',
-          sku: 'NK-SNK-001',
-          current_stock: 45,
-        },
-        {
-          id: 2,
-          name: 'Adidas Ultraboost',
-          category: 'Running',
-          brand: 'Adidas',
-          size: '43',
-          color: 'Black',
-          purchase_price: 90,
-          retail_price: 140,
-          wholesale_price: 120,
-          supplier: 'Adidas Official',
-          sku: 'AD-RUN-001',
-          current_stock: 30,
-        },
-      ];
-
-      const mockTransactions: InventoryTransaction[] = [
-        {
-          id: 1,
-          product_id: 1,
-          product_name: 'Nike Air Max',
-          transaction_type: 'in',
-          quantity: 50,
-          batch_number: 'BATCH-001',
-          notes: 'Initial stock',
-          created_at: '2024-01-20T10:00:00',
-        },
-        {
-          id: 2,
-          product_id: 1,
-          product_name: 'Nike Air Max',
-          transaction_type: 'out',
-          quantity: 5,
-          notes: 'Sale: INV-001',
-          created_at: '2024-01-20T14:30:00',
-        },
-        {
-          id: 3,
-          product_id: 2,
-          product_name: 'Adidas Ultraboost',
-          transaction_type: 'in',
-          quantity: 30,
-          batch_number: 'BATCH-002',
-          notes: 'New shipment',
-          created_at: '2024-01-19T09:00:00',
-        },
-      ];
-
-      setProducts(mockProducts);
-      setTransactions(mockTransactions);
+      const [productsData, transactionsData] = await Promise.all([
+        productService.getAll(),
+        inventoryService.getTransactions()
+      ]);
+      
+      setProducts(productsData);
+      setTransactions(transactionsData.transactions);
     } catch (err: any) {
       setError(err.message || 'Failed to load data');
     } finally {
@@ -169,41 +102,33 @@ export default function InventoryPage() {
     }
 
     try {
-      setLoading(true);
+      setSubmitting(true);
       setError('');
       
-      // Mock API call
-      const newTransaction: InventoryTransaction = {
-        id: transactions.length + 1,
+      const stockInData: StockInRequest = {
         product_id: selectedProduct as number,
-        product_name: products.find(p => p.id === selectedProduct)?.name || '',
-        transaction_type: 'in',
         quantity,
-        batch_number: batchNumber,
-        notes,
-        created_at: new Date().toISOString(),
+        batch_number: batchNumber || undefined,
+        notes: notes || undefined
       };
 
-      setTransactions([newTransaction, ...transactions]);
-      
-      // Update product stock
-      setProducts(products.map(p => 
-        p.id === selectedProduct 
-          ? { ...p, current_stock: p.current_stock + quantity }
-          : p
-      ));
+      const response = await inventoryService.stockIn(stockInData);
 
       // Reset form
       setSelectedProduct('');
       setQuantity(0);
       setBatchNumber('');
       setNotes('');
-      setSuccess('Stock added successfully!');
+      setSuccess(`Stock added successfully! New stock: ${response.new_stock}`);
+      
+      // Refresh data
+      await fetchData();
+      
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to add stock');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -212,7 +137,6 @@ export default function InventoryPage() {
   };
 
   if (loading) return <LoadingSpinner message="Loading inventory..." />;
-  if (error) return <ErrorAlert error={error} onRetry={fetchData} />;
 
   return (
     <Box>
@@ -224,11 +148,13 @@ export default function InventoryPage() {
           startIcon={<Refresh />}
           onClick={fetchData}
           variant="outlined"
+          disabled={loading}
         >
           Refresh
         </Button>
       </Box>
 
+      {error && <ErrorAlert error={error} onRetry={fetchData} />}
       {success && (
         <Alert severity="success" sx={{ mb: 2 }}>
           {success}
@@ -263,7 +189,7 @@ export default function InventoryPage() {
               </MenuItem>
               {products.map((product) => (
                 <MenuItem key={product.id} value={product.id}>
-                  {product.name} - {product.brand} ({product.size}, {product.color})
+                  {product.name} - {product.brand} ({product.size}, {product.color}) - Stock: {product.current_stock}
                 </MenuItem>
               ))}
             </TextField>
@@ -298,9 +224,9 @@ export default function InventoryPage() {
               size="large"
               startIcon={<Add />}
               onClick={handleStockIn}
-              disabled={!selectedProduct || quantity <= 0}
+              disabled={!selectedProduct || quantity <= 0 || submitting}
             >
-              Add Stock
+              {submitting ? 'Adding Stock...' : 'Add Stock'}
             </Button>
           </Box>
         </Paper>
@@ -345,6 +271,15 @@ export default function InventoryPage() {
                   <TableCell>{transaction.notes || '-'}</TableCell>
                 </TableRow>
               ))}
+              {transactions.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} align="center">
+                    <Typography color="text.secondary" sx={{ py: 3 }}>
+                      No transactions found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -416,6 +351,15 @@ export default function InventoryPage() {
                   </TableRow>
                 );
               })}
+              {products.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    <Typography color="text.secondary" sx={{ py: 3 }}>
+                      No products found
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </TableContainer>

@@ -27,6 +27,8 @@ import {
   Receipt,
 } from '@mui/icons-material';
 import type { Product } from '../../services/productService';
+import { productService } from '../../services/productService';
+import { salesService, type CreateSaleRequest } from '../../services/salesService';
 import SalesHistory from '../../components/sales/SalesHistoryPage';
 import InvoiceDialog from '../../components/sales/InvoiceDialog';
 
@@ -65,6 +67,7 @@ export default function SalesPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [saleType, setSaleType] = useState<'retail' | 'wholesale'>('retail');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState<any>(null);
@@ -74,53 +77,12 @@ export default function SalesPage() {
   }, []);
 
   const fetchProducts = async () => {
-    // Mock data - replace with actual API call
-    const mockProducts: Product[] = [
-      {
-        id: 1,
-        name: 'Nike Air Max',
-        category: 'Sneakers',
-        brand: 'Nike',
-        size: '42',
-        color: 'White',
-        purchase_price: 80,
-        retail_price: 120,
-        wholesale_price: 100,
-        supplier: 'Nike Store',
-        sku: 'NK-SNK-001',
-        current_stock: 45,
-      },
-      {
-        id: 2,
-        name: 'Adidas Ultraboost',
-        category: 'Running',
-        brand: 'Adidas',
-        size: '43',
-        color: 'Black',
-        purchase_price: 90,
-        retail_price: 140,
-        wholesale_price: 120,
-        supplier: 'Adidas Official',
-        sku: 'AD-RUN-001',
-        current_stock: 30,
-      },
-      {
-        id: 3,
-        name: 'Puma Suede Classic',
-        category: 'Casual',
-        brand: 'Puma',
-        size: '41',
-        color: 'Blue',
-        purchase_price: 60,
-        retail_price: 95,
-        wholesale_price: 80,
-        supplier: 'Puma Distributor',
-        sku: 'PM-CAS-001',
-        current_stock: 8,
-      },
-    ];
-
-    setProducts(mockProducts);
+    try {
+      const productsData = await productService.getAll();
+      setProducts(productsData);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load products');
+    }
   };
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
@@ -130,9 +92,20 @@ export default function SalesPage() {
   const addToCart = () => {
     if (!selectedProduct) return;
 
+    // Check if product has enough stock
+    if (selectedProduct.current_stock <= 0) {
+      setError('Product is out of stock');
+      return;
+    }
+
     const existingItem = cart.find(item => item.product.id === selectedProduct.id);
 
     if (existingItem) {
+      // Check if adding one more would exceed stock
+      if (existingItem.quantity >= selectedProduct.current_stock) {
+        setError(`Not enough stock. Available: ${selectedProduct.current_stock}`);
+        return;
+      }
       // Update quantity if product already in cart
       updateQuantity(existingItem.product.id, existingItem.quantity + 1);
     } else {
@@ -148,11 +121,19 @@ export default function SalesPage() {
     }
 
     setSelectedProduct(null);
+    setError(''); // Clear any previous errors
   };
 
   const updateQuantity = (productId: number, newQuantity: number) => {
     if (newQuantity <= 0) {
       removeFromCart(productId);
+      return;
+    }
+
+    // Check stock availability
+    const product = products.find(p => p.id === productId);
+    if (product && newQuantity > product.current_stock) {
+      setError(`Not enough stock for ${product.name}. Available: ${product.current_stock}`);
       return;
     }
 
@@ -168,6 +149,7 @@ export default function SalesPage() {
       }
       return item;
     }));
+    setError(''); // Clear any previous errors
   };
 
   const removeFromCart = (productId: number) => {
@@ -179,17 +161,32 @@ export default function SalesPage() {
   };
 
   const completeSale = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0) {
+      setError('Cart is empty');
+      return;
+    }
 
     setLoading(true);
     try {
+      const saleData: CreateSaleRequest = {
+        items: cart.map(item => ({
+          product_id: item.product.id,
+          quantity: item.quantity,
+          unit_price: item.unitPrice
+        })),
+        sale_type: saleType,
+        payment_method: 'cash' // You can make this configurable
+      };
+
+      const response = await salesService.createSale(saleData);
+
+      // Create invoice data for dialog
       const subtotal = calculateTotal();
       const tax = subtotal * 0.1; // 10% tax
       const total = subtotal + tax;
 
-      // Create invoice data
       const invoiceData = {
-        invoice_number: `INV-${new Date().getFullYear()}${(new Date().getMonth() + 1).toString().padStart(2, '0')}${new Date().getDate().toString().padStart(2, '0')}-${Math.random().toString(36).substr(2, 3).toUpperCase()}`,
+        invoice_number: response.invoice_number,
         date: new Date().toLocaleString(),
         sale_type: saleType,
         items: cart.map(item => ({
@@ -210,14 +207,21 @@ export default function SalesPage() {
 
       // Clear cart and show success
       setCart([]);
-      setSuccess('Sale completed successfully!');
+      setSuccess(`Sale completed successfully! Invoice: ${response.invoice_number}`);
+      
+      // Refresh products to get updated stock
+      await fetchProducts();
+      
       setTimeout(() => setSuccess(''), 5000);
-    } catch (error) {
-      console.error('Failed to complete sale:', error);
+    } catch (err: any) {
+      setError(err.message || 'Failed to complete sale');
     } finally {
       setLoading(false);
     }
   };
+
+  // Filter products that are in stock for the autocomplete
+  const availableProducts = products.filter(product => product.current_stock > 0);
 
   return (
     <Box>
@@ -225,8 +229,14 @@ export default function SalesPage() {
         Sales Management
       </Typography>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
           {success}
         </Alert>
       )}
@@ -265,8 +275,8 @@ export default function SalesPage() {
             </Box>
 
             <Autocomplete
-              options={products}
-              getOptionLabel={(option) => `${option.name} - ${option.brand} (${option.size}, ${option.color})`}
+              options={availableProducts}
+              getOptionLabel={(option) => `${option.name} - ${option.brand} (${option.size}, ${option.color}) - Stock: ${option.current_stock}`}
               value={selectedProduct}
               onChange={(_, value) => setSelectedProduct(value)}
               renderInput={(params) => (
@@ -278,6 +288,7 @@ export default function SalesPage() {
                   margin="normal"
                 />
               )}
+              isOptionEqualToValue={(option, value) => option.id === value.id}
             />
 
             <Button
@@ -347,8 +358,8 @@ export default function SalesPage() {
                               </IconButton>
                             </Box>
                           </TableCell>
-                          <TableCell align="right">KES {item.unitPrice}</TableCell>
-                          <TableCell align="right">KES {item.subtotal}</TableCell>
+                          <TableCell align="right">KES {item.unitPrice.toFixed(2)}</TableCell>
+                          <TableCell align="right">KES {item.subtotal.toFixed(2)}</TableCell>
                           <TableCell align="center">
                             <IconButton
                               size="small"

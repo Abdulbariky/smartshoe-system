@@ -16,6 +16,7 @@ import {
   IconButton,
   Tooltip,
   TablePagination,
+  Alert,
 } from '@mui/material';
 import {
   Add,
@@ -23,11 +24,11 @@ import {
   Edit,
   Delete,
   Inventory,
+  Refresh,
 } from '@mui/icons-material';
 import type { Product } from '../../services/productService';
-import { productService } from '../../services/productService'; // ✅ Correct for named export
+import { productService } from '../../services/productService';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
-import ErrorAlert from '../../components/common/ErrorAlert';
 import AddProductDialog from '../../components/products/AddProductDialog';
 import EditProductDialog from '../../components/products/EditProductDialog';
 
@@ -36,6 +37,7 @@ export default function ProductsPage() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -50,12 +52,20 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       setError('');
+      console.log('🔄 Fetching products from API...');
 
       const products = await productService.getAll();
+      console.log('✅ Products loaded:', products);
+      
       setProducts(products);
       setFilteredProducts(products);
+      
+      if (products.length === 0) {
+        setError('No products found. Add some products to get started!');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to load products');
+      console.error('❌ Failed to load products:', err);
+      setError(err.message || 'Failed to load products. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -94,12 +104,30 @@ export default function ProductsPage() {
   const handleDeleteProduct = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
+        setLoading(true);
         await productService.delete(id);
-        fetchProducts();
+        setSuccess('Product deleted successfully!');
+        fetchProducts(); // Refresh the list
+        setTimeout(() => setSuccess(''), 3000);
       } catch (err: any) {
-        setError(err.response?.data?.message || 'Failed to delete product');
+        setError(err.message || 'Failed to delete product');
+        setTimeout(() => setError(''), 5000);
+      } finally {
+        setLoading(false);
       }
     }
+  };
+
+  const handleProductAdded = () => {
+    setSuccess('Product added successfully!');
+    fetchProducts(); // Refresh the list
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const handleProductUpdated = () => {
+    setSuccess('Product updated successfully!');
+    fetchProducts(); // Refresh the list
+    setTimeout(() => setSuccess(''), 3000);
   };
 
   const getStockStatus = (stock: number) => {
@@ -108,23 +136,47 @@ export default function ProductsPage() {
     return { label: 'In Stock', color: 'success' as const };
   };
 
-  if (loading) return <LoadingSpinner message="Loading products..." />;
-  if (error) return <ErrorAlert error={error} onRetry={fetchProducts} />;
+  if (loading && products.length === 0) {
+    return <LoadingSpinner message="Loading products..." />;
+  }
 
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
         <Typography variant="h4" fontWeight="bold">
-          Products
+          Products ({filteredProducts.length})
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setAddDialogOpen(true)}
-        >
-          Add Product
-        </Button>
+        <Box display="flex" gap={2}>
+          <Button
+            startIcon={<Refresh />}
+            onClick={fetchProducts}
+            variant="outlined"
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setAddDialogOpen(true)}
+          >
+            Add Product
+          </Button>
+        </Box>
       </Box>
+
+      {/* Alerts */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+          {error}
+        </Alert>
+      )}
+
+      {success && (
+        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+          {success}
+        </Alert>
+      )}
 
       {/* Search Bar */}
       <Paper sx={{ p: 2, mb: 3 }}>
@@ -218,11 +270,11 @@ export default function ProductsPage() {
                   </TableRow>
                 );
               })}
-            {filteredProducts.length === 0 && (
+            {filteredProducts.length === 0 && !loading && (
               <TableRow>
                 <TableCell colSpan={11} align="center">
                   <Typography color="text.secondary" sx={{ py: 3 }}>
-                    No products found
+                    {searchTerm ? 'No products match your search' : 'No products found. Add some products to get started!'}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -244,7 +296,7 @@ export default function ProductsPage() {
       <AddProductDialog
         open={addDialogOpen}
         onClose={() => setAddDialogOpen(false)}
-        onSuccess={fetchProducts}
+        onSuccess={handleProductAdded}
       />
 
       {/* Edit Product Dialog */}
@@ -255,7 +307,7 @@ export default function ProductsPage() {
           setEditDialogOpen(false);
           setSelectedProduct(null);
         }}
-        onSuccess={fetchProducts}
+        onSuccess={handleProductUpdated}
       />
     </Box>
   );

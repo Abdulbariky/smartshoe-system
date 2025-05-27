@@ -21,16 +21,12 @@ import {
   Visibility, 
   VisibilityOff 
 } from '@mui/icons-material';
-import { authService } from '../../services/authService';
-import { loginSchema } from '../../utils/validation';
-
-type LoginFormData = {
-  username: string;
-  password: string;
-};
+import { useAuth } from '../../context/AuthContext';
+import { loginSchema, type LoginFormData } from '../../utils/validation';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -45,24 +41,36 @@ export default function LoginPage() {
   });
 
   const onSubmit = async (data: LoginFormData) => {
-    setError('');
-    setLoading(true);
-
     try {
-      const response = await authService.login(data.username, data.password);
-      
+      setError('');
+      setLoading(true);
+      console.log('🔄 Attempting login for user:', data.username);
+
+      await login(data.username, data.password);
+      console.log('✅ Login successful, redirecting to dashboard...');
+
       // Store token based on remember me
-      if (rememberMe) {
-        localStorage.setItem('token', response.access_token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-      } else {
-        sessionStorage.setItem('token', response.access_token);
-        sessionStorage.setItem('user', JSON.stringify(response.user));
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+      const user = localStorage.getItem('user') || sessionStorage.getItem('user');
+      
+      if (token && user && !rememberMe) {
+        // Move to session storage if not remembering
+        sessionStorage.setItem('token', token);
+        sessionStorage.setItem('user', user);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } else if (token && user && rememberMe) {
+        // Keep in local storage if remembering
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', user);
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
       }
       
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      console.error('❌ Login failed:', err);
+      setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -124,6 +132,7 @@ export default function LoginPage() {
               helperText={errors.username?.message}
               margin="normal"
               autoFocus
+              disabled={loading}
             />
             
             <TextField
@@ -134,12 +143,14 @@ export default function LoginPage() {
               error={!!errors.password}
               helperText={errors.password?.message}
               margin="normal"
+              disabled={loading}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
+                      disabled={loading}
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -154,6 +165,7 @@ export default function LoginPage() {
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
                   color="primary"
+                  disabled={loading}
                 />
               }
               label="Remember me"
@@ -179,6 +191,19 @@ export default function LoginPage() {
               >
                 Don't have an account? Register here
               </Link>
+            </Box>
+
+            {/* Demo Credentials */}
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                Demo Credentials:
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Username: <strong>admin</strong>
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                Password: <strong>admin123</strong>
+              </Typography>
             </Box>
           </Box>
         </Paper>

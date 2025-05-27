@@ -6,9 +6,11 @@ import uuid
 
 products_bp = Blueprint('products', __name__)
 
-@products_bp.route('/', methods=['GET'])
+@products_bp.route('/', methods=['GET', 'OPTIONS'])
 @jwt_required()
 def list_products():
+    if request.method == 'OPTIONS':
+        return '', 200
     try:
         products = Product.query.order_by(Product.created_at.desc()).all()
         return jsonify({
@@ -19,22 +21,22 @@ def list_products():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@products_bp.route('/', methods=['POST'])
+@products_bp.route('/', methods=['POST', 'OPTIONS'])
 @jwt_required()
 def add_product():
+    if request.method == 'OPTIONS':
+        return '', 200
     try:
         data = request.get_json()
-        
+
         required_fields = ['name', 'brand', 'category', 'size', 'color', 
                           'purchase_price', 'retail_price', 'wholesale_price']
         if not all(field in data for field in required_fields):
             return jsonify({'success': False, 'message': 'Missing required fields'}), 400
         
-        # Check if SKU already exists
         if 'sku' in data and Product.query.filter_by(sku=data['sku']).first():
             return jsonify({'success': False, 'message': 'SKU already exists'}), 400
         
-        # Generate SKU if not provided
         if 'sku' not in data or not data['sku']:
             sku = f"{data['brand'][:2].upper()}-{data['category'][:3].upper()}-{uuid.uuid4().hex[:6].upper()}"
             data['sku'] = sku
@@ -64,17 +66,18 @@ def add_product():
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@products_bp.route('/<int:id>', methods=['PUT'])
+@products_bp.route('/<int:id>', methods=['PUT', 'OPTIONS'])
 @jwt_required()
 def update_product(id):
+    if request.method == 'OPTIONS':
+        return '', 200
     try:
         product = Product.query.get(id)
         if not product:
             return jsonify({'success': False, 'message': 'Product not found'}), 404
         
         data = request.get_json()
-        
-        # Update fields if provided
+
         if 'name' in data:
             product.name = data['name']
         if 'brand' in data:
@@ -105,15 +108,16 @@ def update_product(id):
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@products_bp.route('/<int:id>', methods=['DELETE'])
+@products_bp.route('/<int:id>', methods=['DELETE', 'OPTIONS'])
 @jwt_required()
 def delete_product(id):
+    if request.method == 'OPTIONS':
+        return '', 200
     try:
         product = Product.query.get(id)
         if not product:
             return jsonify({'success': False, 'message': 'Product not found'}), 404
         
-        # Check if product has inventory transactions
         if product.get_current_stock() > 0:
             return jsonify({
                 'success': False, 

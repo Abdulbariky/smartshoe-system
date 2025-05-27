@@ -14,8 +14,9 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { productService } from '../../services/productService';
-import type { Product } from '../../services/productService';
+import { categoryService, brandService } from '../../services/categoryService';
 import type { Category, Brand } from '../../services/categoryService';
+import type { Product } from '../../services/productService';
 
 const schema = yup.object({
   name: yup.string().required('Product name is required'),
@@ -58,6 +59,7 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
   const [error, setError] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
   const {
     register,
@@ -70,31 +72,43 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
 
   useEffect(() => {
     if (open && product) {
-      reset(product);
+      reset({
+        name: product.name,
+        category: product.category,
+        brand: product.brand,
+        size: product.size,
+        color: product.color,
+        purchase_price: product.purchase_price,
+        retail_price: product.retail_price,
+        wholesale_price: product.wholesale_price,
+        supplier: product.supplier || '',
+      });
+      
       loadCategoriesAndBrands();
     }
   }, [open, product, reset]);
 
   const loadCategoriesAndBrands = async () => {
     try {
-      // Replace mock data with real API if needed
-      setCategories([
-        { id: 1, name: 'Sneakers', description: 'Sports and casual sneakers' },
-        { id: 2, name: 'Running', description: 'Professional running shoes' },
-        { id: 3, name: 'Formal', description: 'Office and formal shoes' },
-        { id: 4, name: 'Casual', description: 'Everyday casual shoes' },
-        { id: 5, name: 'Sandals', description: 'Open-toe sandals' },
+      setLoadingData(true);
+      setError('');
+      console.log('🔄 Loading categories and brands from API...');
+
+      const [categoriesData, brandsData] = await Promise.all([
+        categoryService.getAll(),
+        brandService.getAll()
       ]);
 
-      setBrands([
-        { id: 1, name: 'Nike' },
-        { id: 2, name: 'Adidas' },
-        { id: 3, name: 'Puma' },
-        { id: 4, name: 'Clarks' },
-        { id: 5, name: 'Bata' },
-      ]);
-    } catch (err) {
-      console.error('Failed to load categories and brands:', err);
+      console.log('✅ Categories loaded:', categoriesData);
+      console.log('✅ Brands loaded:', brandsData);
+
+      setCategories(categoriesData);
+      setBrands(brandsData);
+    } catch (err: any) {
+      console.error('❌ Failed to load categories and brands:', err);
+      setError('Failed to load categories and brands. Please try again.');
+    } finally {
+      setLoadingData(false);
     }
   };
 
@@ -104,18 +118,22 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
     try {
       setLoading(true);
       setError('');
+      console.log('🔄 Updating product:', product.id, data);
 
-      // ✅ Real API call to update product
       await productService.update(product.id, data);
+      console.log('✅ Product updated successfully');
 
-      onSuccess(); // Refresh list
+      onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update product');
+      console.error('❌ Failed to update product:', err);
+      setError(err.message || 'Failed to update product');
     } finally {
       setLoading(false);
     }
   };
+
+  if (!product) return null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -128,6 +146,12 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
             </Alert>
           )}
 
+          {loadingData && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Loading categories and brands...
+            </Alert>
+          )}
+
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField
               fullWidth
@@ -135,6 +159,7 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
               {...register('name')}
               error={!!errors.name}
               helperText={errors.name?.message}
+              disabled={loading}
             />
 
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -142,10 +167,10 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
                 fullWidth
                 select
                 label="Brand"
-                defaultValue=""
                 {...register('brand')}
                 error={!!errors.brand}
                 helperText={errors.brand?.message}
+                disabled={loading || loadingData}
               >
                 <MenuItem value="">Select Brand</MenuItem>
                 {brands.map((brand) => (
@@ -159,10 +184,10 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
                 fullWidth
                 select
                 label="Category"
-                defaultValue=""
                 {...register('category')}
                 error={!!errors.category}
                 helperText={errors.category?.message}
+                disabled={loading || loadingData}
               >
                 <MenuItem value="">Select Category</MenuItem>
                 {categories.map((cat) => (
@@ -178,10 +203,10 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
                 fullWidth
                 select
                 label="Size"
-                defaultValue=""
                 {...register('size')}
                 error={!!errors.size}
                 helperText={errors.size?.message}
+                disabled={loading}
               >
                 {sizes.map((size) => (
                   <MenuItem key={size} value={size}>
@@ -194,10 +219,10 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
                 fullWidth
                 select
                 label="Color"
-                defaultValue=""
                 {...register('color')}
                 error={!!errors.color}
                 helperText={errors.color?.message}
+                disabled={loading}
               >
                 {colors.map((color) => (
                   <MenuItem key={color} value={color}>
@@ -213,42 +238,52 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
               {...register('supplier')}
               error={!!errors.supplier}
               helperText={errors.supplier?.message}
+              disabled={loading}
             />
 
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
                 fullWidth
                 type="number"
-                label="Purchase Price"
+                label="Purchase Price (KES)"
                 {...register('purchase_price', { valueAsNumber: true })}
                 error={!!errors.purchase_price}
                 helperText={errors.purchase_price?.message}
+                disabled={loading}
               />
 
               <TextField
                 fullWidth
                 type="number"
-                label="Retail Price"
+                label="Retail Price (KES)"
                 {...register('retail_price', { valueAsNumber: true })}
                 error={!!errors.retail_price}
                 helperText={errors.retail_price?.message}
+                disabled={loading}
               />
 
               <TextField
                 fullWidth
                 type="number"
-                label="Wholesale Price"
+                label="Wholesale Price (KES)"
                 {...register('wholesale_price', { valueAsNumber: true })}
                 error={!!errors.wholesale_price}
                 helperText={errors.wholesale_price?.message}
+                disabled={loading}
               />
             </Box>
           </Box>
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={loading}>
+          <Button onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={loading || loadingData}
+          >
             {loading ? 'Updating...' : 'Update Product'}
           </Button>
         </DialogActions>

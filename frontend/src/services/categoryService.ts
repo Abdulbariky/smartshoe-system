@@ -1,3 +1,4 @@
+// src/services/categoryService.ts
 export interface Category {
   id: number;
   name: string;
@@ -7,6 +8,7 @@ export interface Category {
 export interface Brand {
   id: number;
   name: string;
+  country?: string;
 }
 
 function getAuthHeaders(): Record<string, string> {
@@ -19,33 +21,122 @@ function getAuthHeaders(): Record<string, string> {
 
 const BASE_URL = 'http://localhost:5000/api';
 
-export const getCategories = async () => {
-  const res = await fetch(`${BASE_URL}/categories`, {
-    method: 'GET',
-    headers: getAuthHeaders(),
-  });
+// Category Services
+export const categoryService = {
+  getAll: async (): Promise<Category[]> => {
+    const response = await fetch(`${BASE_URL}/categories`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
 
-  if (!res.ok) throw new Error('Failed to load categories');
-  return res.json();
+    if (!response.ok) {
+      throw new Error('Failed to load categories');
+    }
+
+    return await response.json();
+  },
+
+  add: async (data: { name: string; description: string }): Promise<{ message: string }> => {
+    const response = await fetch(`${BASE_URL}/categories`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to add category');
+    }
+
+    return await response.json();
+  },
+
+  update: async (id: number, data: { name: string; description: string }): Promise<{ message: string }> => {
+    const response = await fetch(`${BASE_URL}/categories/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to update category');
+    }
+
+    return await response.json();
+  },
+
+  delete: async (id: number): Promise<{ message: string }> => {
+    const response = await fetch(`${BASE_URL}/categories/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete category');
+    }
+
+    return await response.json();
+  },
 };
 
-export const addCategory = async (data: any) => {
-  const res = await fetch(`${BASE_URL}/categories`, {
-    method: 'POST',
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
+// Brand Services
+export const brandService = {
+  getAll: async (): Promise<Brand[]> => {
+    const response = await fetch(`${BASE_URL}/brands`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
 
-  if (!res.ok) throw new Error('Failed to add category');
-  return res.json();
-};
+    if (!response.ok) {
+      throw new Error('Failed to load brands');
+    }
 
-export const deleteCategory = async (id: number) => {
-  const res = await fetch(`${BASE_URL}/categories/${id}`, {
-    method: 'DELETE',
-    headers: getAuthHeaders(),
-  });
+    return await response.json();
+  },
 
-  if (!res.ok) throw new Error('Failed to delete category');
-  return res.json();
+  add: async (data: { name: string; country?: string }): Promise<{ message: string }> => {
+    const response = await fetch(`${BASE_URL}/brands`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to add brand');
+    }
+
+    return await response.json();
+  },
+
+  update: async (id: number, data: { name: string; country?: string }): Promise<{ message: string }> => {
+    const response = await fetch(`${BASE_URL}/brands/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to update brand');
+    }
+
+    return await response.json();
+  },
+
+  delete: async (id: number): Promise<{ message: string }> => {
+    const response = await fetch(`${BASE_URL}/brands/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete brand');
+    }
+
+    return await response.json();
+  },
 };

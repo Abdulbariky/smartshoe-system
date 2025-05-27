@@ -14,6 +14,7 @@ import { useForm } from 'react-hook-form';
 import { yupResolver } from '@hookform/resolvers/yup';
 import * as yup from 'yup';
 import { productService } from '../../services/productService';
+import { categoryService, brandService } from '../../services/categoryService';
 import type { Category, Brand } from '../../services/categoryService';
 
 const schema = yup.object({
@@ -56,6 +57,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
   const [error, setError] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [loadingData, setLoadingData] = useState(false);
 
   const {
     register,
@@ -74,24 +76,25 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
 
   const loadCategoriesAndBrands = async () => {
     try {
-      // Replace mock data with real API if available
-      setCategories([
-        { id: 1, name: 'Sneakers', description: 'Sports and casual sneakers' },
-        { id: 2, name: 'Running', description: 'Professional running shoes' },
-        { id: 3, name: 'Formal', description: 'Office and formal shoes' },
-        { id: 4, name: 'Casual', description: 'Everyday casual shoes' },
-        { id: 5, name: 'Sandals', description: 'Open-toe sandals' },
+      setLoadingData(true);
+      setError('');
+      console.log('🔄 Loading categories and brands from API...');
+
+      const [categoriesData, brandsData] = await Promise.all([
+        categoryService.getAll(),
+        brandService.getAll()
       ]);
 
-      setBrands([
-        { id: 1, name: 'Nike' },
-        { id: 2, name: 'Adidas' },
-        { id: 3, name: 'Puma' },
-        { id: 4, name: 'Clarks' },
-        { id: 5, name: 'Bata' },
-      ]);
-    } catch (err) {
-      console.error('Failed to load categories and brands:', err);
+      console.log('✅ Categories loaded:', categoriesData);
+      console.log('✅ Brands loaded:', brandsData);
+
+      setCategories(categoriesData);
+      setBrands(brandsData);
+    } catch (err: any) {
+      console.error('❌ Failed to load categories and brands:', err);
+      setError('Failed to load categories and brands. Please try again.');
+    } finally {
+      setLoadingData(false);
     }
   };
 
@@ -99,16 +102,23 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
     try {
       setLoading(true);
       setError('');
+      console.log('🔄 Adding product:', data);
 
-      // ✅ Real API call to create product
-      await productService.add(data)
+      // Add the product with sku (backend will generate if not provided)
+      const productData = {
+        ...data,
+        sku: '', // Backend will auto-generate if empty
+      };
 
+      await productService.add(productData);
+      console.log('✅ Product added successfully');
 
       reset();
-      onSuccess(); // Refresh list
+      onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to add product');
+      console.error('❌ Failed to add product:', err);
+      setError(err.message || 'Failed to add product');
     } finally {
       setLoading(false);
     }
@@ -125,6 +135,12 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
             </Alert>
           )}
 
+          {loadingData && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Loading categories and brands...
+            </Alert>
+          )}
+
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
             <TextField
               fullWidth
@@ -132,6 +148,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
               {...register('name')}
               error={!!errors.name}
               helperText={errors.name?.message}
+              disabled={loading}
             />
 
             <Box sx={{ display: 'flex', gap: 2 }}>
@@ -143,6 +160,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 {...register('brand')}
                 error={!!errors.brand}
                 helperText={errors.brand?.message}
+                disabled={loading || loadingData}
               >
                 <MenuItem value="">Select Brand</MenuItem>
                 {brands.map((brand) => (
@@ -160,6 +178,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 {...register('category')}
                 error={!!errors.category}
                 helperText={errors.category?.message}
+                disabled={loading || loadingData}
               >
                 <MenuItem value="">Select Category</MenuItem>
                 {categories.map((cat) => (
@@ -179,6 +198,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 {...register('size')}
                 error={!!errors.size}
                 helperText={errors.size?.message}
+                disabled={loading}
               >
                 {sizes.map((size) => (
                   <MenuItem key={size} value={size}>
@@ -195,6 +215,7 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 {...register('color')}
                 error={!!errors.color}
                 helperText={errors.color?.message}
+                disabled={loading}
               >
                 {colors.map((color) => (
                   <MenuItem key={color} value={color}>
@@ -210,42 +231,52 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
               {...register('supplier')}
               error={!!errors.supplier}
               helperText={errors.supplier?.message}
+              disabled={loading}
             />
 
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField
                 fullWidth
                 type="number"
-                label="Purchase Price"
+                label="Purchase Price (KES)"
                 {...register('purchase_price', { valueAsNumber: true })}
                 error={!!errors.purchase_price}
                 helperText={errors.purchase_price?.message}
+                disabled={loading}
               />
 
               <TextField
                 fullWidth
                 type="number"
-                label="Retail Price"
+                label="Retail Price (KES)"
                 {...register('retail_price', { valueAsNumber: true })}
                 error={!!errors.retail_price}
                 helperText={errors.retail_price?.message}
+                disabled={loading}
               />
 
               <TextField
                 fullWidth
                 type="number"
-                label="Wholesale Price"
+                label="Wholesale Price (KES)"
                 {...register('wholesale_price', { valueAsNumber: true })}
                 error={!!errors.wholesale_price}
                 helperText={errors.wholesale_price?.message}
+                disabled={loading}
               />
             </Box>
           </Box>
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="contained" disabled={loading}>
+          <Button onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={loading || loadingData}
+          >
             {loading ? 'Adding...' : 'Add Product'}
           </Button>
         </DialogActions>

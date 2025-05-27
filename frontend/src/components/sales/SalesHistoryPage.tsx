@@ -15,81 +15,56 @@ import {
   TextField,
   InputAdornment,
   TablePagination,
+  Alert,
 } from '@mui/material';
 import {
   Visibility,
   Search,
   Print,
+  Refresh,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-
-interface Sale {
-  id: number;
-  invoice_number: string;
-  sale_type: 'retail' | 'wholesale';
-  total_amount: number;
-  payment_method: string;
-  created_at: string;
-  items_count: number;
-  customer_name?: string;
-}
+import { salesService, type Sale } from '../../services/salesService';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
 
 export default function SalesHistory() {
   const [sales, setSales] = useState<Sale[]>([]);
   const [filteredSales, setFilteredSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  useEffect(() => {
-    // Mock sales data
-    const mockSales: Sale[] = [
-      {
-        id: 1,
-        invoice_number: 'INV-20240120-001',
-        sale_type: 'retail',
-        total_amount: 280,
-        payment_method: 'cash',
-        created_at: '2024-01-20T10:30:00',
-        items_count: 2,
-        customer_name: 'Walk-in Customer',
-      },
-      {
-        id: 2,
-        invoice_number: 'INV-20240120-002',
-        sale_type: 'wholesale',
-        total_amount: 1200,
-        payment_method: 'credit',
-        created_at: '2024-01-20T14:15:00',
-        items_count: 10,
-        customer_name: 'ABC Retailers',
-      },
-      {
-        id: 3,
-        invoice_number: 'INV-20240119-003',
-        sale_type: 'retail',
-        total_amount: 140,
-        payment_method: 'card',
-        created_at: '2024-01-19T16:45:00',
-        items_count: 1,
-      },
-      {
-        id: 4,
-        invoice_number: 'INV-20240119-004',
-        sale_type: 'wholesale',
-        total_amount: 3500,
-        payment_method: 'bank_transfer',
-        created_at: '2024-01-19T11:20:00',
-        items_count: 25,
-        customer_name: 'XYZ Distributors',
-      },
-    ];
+  const fetchSales = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      console.log('🔄 Loading sales history from API...');
 
-    setSales(mockSales);
-    setFilteredSales(mockSales);
+      // ✅ Real API call instead of mock data
+      const response = await salesService.getSales();
+      console.log('✅ Sales history loaded:', response);
+
+      setSales(response.sales);
+      setFilteredSales(response.sales);
+    } catch (err: any) {
+      console.error('❌ Failed to load sales history:', err);
+      setError(err.message || 'Failed to load sales history');
+      
+      // Clear sales on error
+      setSales([]);
+      setFilteredSales([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSales();
   }, []);
 
   useEffect(() => {
@@ -98,8 +73,7 @@ export default function SalesHistory() {
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(sale =>
-        sale.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        sale.customer_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        sale.invoice_number.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -136,17 +110,40 @@ export default function SalesHistory() {
     return <Chip label={label} color={color} size="small" />;
   };
 
+  const getSaleTypeChip = (type: 'retail' | 'wholesale') => {
+    return (
+      <Chip
+        label={type}
+        color={type === 'retail' ? 'default' : 'secondary'}
+        size="small"
+      />
+    );
+  };
+
+  if (loading) return <LoadingSpinner message="Loading sales history..." />;
+
   return (
     <Box>
-      <Typography variant="h5" gutterBottom>
-        Sales History
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5" fontWeight="bold">
+          Sales History ({filteredSales.length})
+        </Typography>
+        <IconButton onClick={fetchSales} disabled={loading}>
+          <Refresh />
+        </IconButton>
+      </Box>
+
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
 
       {/* Filters */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Box display="flex" gap={2} alignItems="center">
           <TextField
-            placeholder="Search by invoice or customer..."
+            placeholder="Search by invoice number..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             sx={{ flex: 1 }}
@@ -181,7 +178,6 @@ export default function SalesHistory() {
             <TableRow>
               <TableCell>Invoice Number</TableCell>
               <TableCell>Date & Time</TableCell>
-              <TableCell>Customer</TableCell>
               <TableCell>Type</TableCell>
               <TableCell>Items</TableCell>
               <TableCell align="right">Total Amount</TableCell>
@@ -200,13 +196,8 @@ export default function SalesHistory() {
                   <TableCell>
                     {new Date(sale.created_at).toLocaleString()}
                   </TableCell>
-                  <TableCell>{sale.customer_name || 'Walk-in'}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={sale.sale_type}
-                      color={sale.sale_type === 'retail' ? 'default' : 'secondary'}
-                      size="small"
-                    />
+                    {getSaleTypeChip(sale.sale_type)}
                   </TableCell>
                   <TableCell>{sale.items_count}</TableCell>
                   <TableCell align="right">
@@ -219,18 +210,44 @@ export default function SalesHistory() {
                   </TableCell>
                   <TableCell align="center">
                     <Tooltip title="View Details">
-                      <IconButton size="small" color="primary">
+                      <IconButton 
+                        size="small" 
+                        color="primary"
+                        onClick={() => {
+                          // TODO: Implement view details functionality
+                          console.log('View sale details:', sale.id);
+                        }}
+                      >
                         <Visibility />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Print Invoice">
-                      <IconButton size="small" color="default">
+                      <IconButton 
+                        size="small" 
+                        color="default"
+                        onClick={() => {
+                          // TODO: Implement print functionality
+                          console.log('Print invoice:', sale.invoice_number);
+                        }}
+                      >
                         <Print />
                       </IconButton>
                     </Tooltip>
                   </TableCell>
                 </TableRow>
               ))}
+            {filteredSales.length === 0 && !loading && (
+              <TableRow>
+                <TableCell colSpan={7} align="center">
+                  <Typography color="text.secondary" sx={{ py: 3 }}>
+                    {searchTerm || dateFilter 
+                      ? 'No sales match your search criteria' 
+                      : 'No sales found'
+                    }
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
         <TablePagination

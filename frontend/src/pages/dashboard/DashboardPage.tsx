@@ -32,20 +32,13 @@ import {
 import StatsCard from '../../components/dashboard/StatsCard';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorAlert from '../../components/common/ErrorAlert';
-
-interface DashboardStats {
-  totalSales: number;
-  totalProducts: number;
-  lowStockCount: number;
-  todaySales: number;
-  inventoryValue: number;
-}
+import { dashboardService, type DashboardStats, type RecentSale, type LowStockProduct } from '../../services/dashboardService';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentSales, setRecentSales] = useState<any[]>([]);
+  const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
   const [salesTrend, setSalesTrend] = useState<any[]>([]);
-  const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
+  const [lowStockProducts, setLowStockProducts] = useState<LowStockProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -53,51 +46,71 @@ export default function DashboardPage() {
     try {
       setLoading(true);
       setError('');
+      console.log('🔄 Loading dashboard data from API...');
 
-      // Mock data with more realistic values
-      const mockStats: DashboardStats = {
-        totalSales: 15420,
-        totalProducts: 45,
-        lowStockCount: 3,
-        todaySales: 2850,
-        inventoryValue: 125000,
-      };
+      // ✅ Real API calls instead of mock data
+      const [statsData, recentSalesData, lowStockData] = await Promise.all([
+        dashboardService.getStats(),
+        dashboardService.getRecentSales(),
+        dashboardService.getLowStockProducts()
+      ]);
 
-      const mockRecentSales = [
-        { id: 1, invoice: 'INV-001', amount: 280, date: '2024-01-22', status: 'completed', customer: 'Walk-in' },
-        { id: 2, invoice: 'INV-002', amount: 450, date: '2024-01-22', status: 'completed', customer: 'John Doe' },
-        { id: 3, invoice: 'INV-003', amount: 1200, date: '2024-01-21', status: 'pending', customer: 'ABC Store' },
-        { id: 4, invoice: 'INV-004', amount: 320, date: '2024-01-21', status: 'completed', customer: 'Walk-in' },
-        { id: 5, invoice: 'INV-005', amount: 600, date: '2024-01-20', status: 'completed', customer: 'XYZ Shop' },
-      ];
+      console.log('✅ Dashboard stats loaded:', statsData);
+      console.log('✅ Recent sales loaded:', recentSalesData);
+      console.log('✅ Low stock products loaded:', lowStockData);
 
-      // Sales trend for last 7 days
-      const mockSalesTrend = [
-        { day: 'Mon', sales: 1200 },
-        { day: 'Tue', sales: 1900 },
-        { day: 'Wed', sales: 1500 },
-        { day: 'Thu', sales: 2200 },
-        { day: 'Fri', sales: 2850 },
-        { day: 'Sat', sales: 3200 },
-        { day: 'Sun', sales: 2850 },
-      ];
+      setStats(statsData);
+      setRecentSales(recentSalesData);
+      setLowStockProducts(lowStockData);
 
-      // Low stock products
-      const mockLowStock = [
-        { id: 1, name: 'Nike Air Max', stock: 5, minStock: 10 },
-        { id: 2, name: 'Puma Suede', stock: 3, minStock: 10 },
-        { id: 3, name: 'Clarks Desert Boot', stock: 2, minStock: 5 },
-      ];
+      // Generate sales trend based on recent sales data
+      const salesTrendData = generateSalesTrend(recentSalesData);
+      setSalesTrend(salesTrendData);
 
-      setStats(mockStats);
-      setRecentSales(mockRecentSales);
-      setSalesTrend(mockSalesTrend);
-      setLowStockProducts(mockLowStock);
     } catch (err: any) {
+      console.error('❌ Failed to load dashboard data:', err);
       setError(err.message || 'Failed to load dashboard data');
+      
+      // Fallback to basic stats if API fails
+      setStats({
+        totalSales: 0,
+        totalProducts: 0,
+        lowStockCount: 0,
+        todaySales: 0,
+        inventoryValue: 0
+      });
+      setRecentSales([]);
+      setLowStockProducts([]);
+      setSalesTrend([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Generate sales trend from recent sales data
+  const generateSalesTrend = (sales: RecentSale[]) => {
+    const last7Days = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const dayString = date.toDateString();
+      
+      // Calculate sales for this day
+      const daySales = sales
+        .filter(sale => new Date(sale.created_at).toDateString() === dayString)
+        .reduce((sum, sale) => sum + sale.total_amount, 0);
+      
+      last7Days.push({
+        day: dayName,
+        sales: daySales
+      });
+    }
+    
+    return last7Days;
   };
 
   useEffect(() => {
@@ -121,6 +134,7 @@ export default function DashboardPage() {
           startIcon={<Refresh />}
           onClick={fetchDashboardData}
           variant="outlined"
+          disabled={loading}
         >
           Refresh
         </Button>
@@ -136,15 +150,16 @@ export default function DashboardPage() {
         <StatsCard
           title="Today's Sales"
           value={`KES ${stats.todaySales.toLocaleString()}`}
-          subtitle="12 transactions"
+          subtitle={`${recentSales.filter(sale => 
+            new Date(sale.created_at).toDateString() === new Date().toDateString()
+          ).length} transactions`}
           icon={<AttachMoney sx={{ fontSize: 40 }} />}
-          trend={{ value: 15, isPositive: true }}
           color="success"
         />
         <StatsCard
           title="Total Products"
           value={stats.totalProducts}
-          subtitle="In 5 categories"
+          subtitle="In inventory"
           icon={<Inventory sx={{ fontSize: 40 }} />}
           color="primary"
         />
@@ -199,34 +214,43 @@ export default function DashboardPage() {
               ⚠️ Low Stock Products
             </Typography>
             <Box sx={{ mt: 2 }}>
-              {lowStockProducts.map((product) => (
-                <Box
-                  key={product.id}
-                  sx={{
-                    p: 1.5,
-                    mb: 1,
-                    bgcolor: 'warning.light',
-                    borderRadius: 1,
-                    opacity: 0.9,
-                  }}
-                >
-                  <Typography variant="body2" fontWeight="medium">
-                    {product.name}
-                  </Typography>
-                  <Typography variant="caption" color="error">
-                    Stock: {product.stock} (Min: {product.minStock})
-                  </Typography>
-                </Box>
-              ))}
-              <Button
-                size="small"
-                fullWidth
-                sx={{ mt: 2 }}
-                variant="outlined"
-                color="warning"
-              >
-                View All Low Stock
-              </Button>
+              {lowStockProducts.length > 0 ? (
+                <>
+                  {lowStockProducts.slice(0, 3).map((product) => (
+                    <Box
+                      key={product.id}
+                      sx={{
+                        p: 1.5,
+                        mb: 1,
+                        bgcolor: 'warning.light',
+                        borderRadius: 1,
+                        opacity: 0.9,
+                      }}
+                    >
+                      <Typography variant="body2" fontWeight="medium">
+                        {product.name}
+                      </Typography>
+                      <Typography variant="caption" color="error">
+                        Stock: {product.current_stock} | {product.brand}
+                      </Typography>
+                    </Box>
+                  ))}
+                  <Button
+                    size="small"
+                    fullWidth
+                    sx={{ mt: 2 }}
+                    variant="outlined"
+                    color="warning"
+                    onClick={() => window.location.href = '/inventory'}
+                  >
+                    View All Low Stock
+                  </Button>
+                </>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  All products are well stocked! 🎉
+                </Typography>
+              )}
             </Box>
           </Paper>
         </Box>
@@ -237,38 +261,51 @@ export default function DashboardPage() {
         <Typography variant="h6" gutterBottom>
           Recent Sales
         </Typography>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Invoice</TableCell>
-                <TableCell>Date</TableCell>
-                <TableCell>Customer</TableCell>
-                <TableCell align="right">Amount</TableCell>
-                <TableCell>Status</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {recentSales.map((sale) => (
-                <TableRow key={sale.id} hover>
-                  <TableCell>{sale.invoice}</TableCell>
-                  <TableCell>{sale.date}</TableCell>
-                  <TableCell>{sale.customer}</TableCell>
-                  <TableCell align="right">KES {sale.amount}</TableCell>
-                  <TableCell>
-                    <Chip
-                      label={sale.status}
-                      color={sale.status === 'completed' ? 'success' : 'warning'}
-                      size="small"
-                    />
-                  </TableCell>
+        {recentSales.length > 0 ? (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Invoice</TableCell>
+                  <TableCell>Date</TableCell>
+                  <TableCell>Customer</TableCell>
+                  <TableCell align="right">Amount</TableCell>
+                  <TableCell>Payment</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {recentSales.map((sale) => (
+                  <TableRow key={sale.id} hover>
+                    <TableCell>{sale.invoice_number}</TableCell>
+                    <TableCell>
+                      {new Date(sale.created_at).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>{sale.customer || 'Walk-in'}</TableCell>
+                    <TableCell align="right">KES {sale.total_amount}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={sale.payment_method}
+                        color="success"
+                        size="small"
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
+            No recent sales found
+          </Typography>
+        )}
         <Box sx={{ mt: 2, textAlign: 'center' }}>
-          <Button size="small">View All Sales</Button>
+          <Button 
+            size="small"
+            onClick={() => window.location.href = '/sales'}
+          >
+            View All Sales
+          </Button>
         </Box>
       </Paper>
     </Box>

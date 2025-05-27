@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -11,6 +11,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Button,
+  Alert,
 } from '@mui/material';
 import {
   LineChart,
@@ -32,7 +34,20 @@ import {
   Assessment,
   Inventory,
   AttachMoney,
+  Refresh,
 } from '@mui/icons-material';
+import { reportsService } from '../../services/reportsService';
+import type {
+  SalesOverviewData,
+  SalesTrendData,
+  CategoryData,
+  BrandPerformanceData,
+  MonthlyTrendData,
+  TopProductData,
+  InventoryAnalysisData,
+} from '../../services/reportsService';
+import LoadingSpinner from '../../components/common/LoadingSpinner';
+import ErrorAlert from '../../components/common/ErrorAlert';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -58,46 +73,70 @@ function TabPanel(props: TabPanelProps) {
 export default function ReportsPage() {
   const [tabValue, setTabValue] = useState(0);
   const [period, setPeriod] = useState('week');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  // Mock data for charts
-  const salesData = [
-    { name: 'Mon', sales: 4000, target: 3500 },
-    { name: 'Tue', sales: 3000, target: 3500 },
-    { name: 'Wed', sales: 5000, target: 3500 },
-    { name: 'Thu', sales: 2780, target: 3500 },
-    { name: 'Fri', sales: 1890, target: 3500 },
-    { name: 'Sat', sales: 6390, target: 3500 },
-    { name: 'Sun', sales: 3490, target: 3500 },
-  ];
+  // Real data states
+  const [salesOverview, setSalesOverview] = useState<SalesOverviewData | null>(null);
+  const [salesTrend, setSalesTrend] = useState<SalesTrendData[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [brandPerformance, setBrandPerformance] = useState<BrandPerformanceData[]>([]);
+  const [monthlyTrend, setMonthlyTrend] = useState<MonthlyTrendData[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProductData[]>([]);
+  const [inventoryAnalysis, setInventoryAnalysis] = useState<InventoryAnalysisData | null>(null);
 
-  const categoryData = [
-    { name: 'Sneakers', value: 400, color: '#0088FE' },
-    { name: 'Running', value: 300, color: '#00C49F' },
-    { name: 'Formal', value: 200, color: '#FFBB28' },
-    { name: 'Casual', value: 150, color: '#FF8042' },
-    { name: 'Sandals', value: 100, color: '#8884D8' },
-  ];
+  useEffect(() => {
+    fetchReportsData();
+  }, [period]);
 
-  const brandPerformance = [
-    { brand: 'Nike', sales: 12000, units: 100 },
-    { brand: 'Adidas', sales: 9000, units: 75 },
-    { brand: 'Puma', sales: 6000, units: 50 },
-    { brand: 'Clarks', sales: 4500, units: 25 },
-    { brand: 'Bata', sales: 3000, units: 30 },
-  ];
+  const fetchReportsData = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      console.log('🔄 Loading reports data from API...');
 
-  const monthlyTrend = [
-    { month: 'Jan', revenue: 45000, profit: 12000 },
-    { month: 'Feb', revenue: 52000, profit: 14000 },
-    { month: 'Mar', revenue: 48000, profit: 13000 },
-    { month: 'Apr', revenue: 61000, profit: 16000 },
-    { month: 'May', revenue: 55000, profit: 15000 },
-    { month: 'Jun', revenue: 67000, profit: 18000 },
-  ];
+      // Load all report data in parallel
+      const [
+        salesOverviewData,
+        salesTrendData,
+        categoryAnalysisData,
+        brandPerformanceData,
+        monthlyTrendData,
+        topProductsData,
+        inventoryAnalysisData,
+      ] = await Promise.all([
+        reportsService.getSalesOverview(),
+        reportsService.getSalesTrend(),
+        reportsService.getCategoryAnalysis(),
+        reportsService.getBrandPerformance(),
+        reportsService.getMonthlyTrend(),
+        reportsService.getTopProducts(),
+        reportsService.getInventoryAnalysis(),
+      ]);
+
+      console.log('✅ Reports data loaded successfully');
+
+      setSalesOverview(salesOverviewData);
+      setSalesTrend(salesTrendData);
+      setCategoryData(categoryAnalysisData);
+      setBrandPerformance(brandPerformanceData);
+      setMonthlyTrend(monthlyTrendData);
+      setTopProducts(topProductsData);
+      setInventoryAnalysis(inventoryAnalysisData);
+    } catch (err: any) {
+      console.error('❌ Failed to load reports data:', err);
+      setError(err.message || 'Failed to load reports data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
+
+  if (loading) return <LoadingSpinner message="Loading reports..." />;
+  if (error) return <ErrorAlert error={error} onRetry={fetchReportsData} />;
 
   return (
     <Box>
@@ -105,19 +144,30 @@ export default function ReportsPage() {
         <Typography variant="h4" fontWeight="bold">
           Reports & Analytics
         </Typography>
-        <FormControl size="small" sx={{ minWidth: 120 }}>
-          <InputLabel>Period</InputLabel>
-          <Select
-            value={period}
-            label="Period"
-            onChange={(e) => setPeriod(e.target.value)}
+        <Box display="flex" gap={2}>
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Period</InputLabel>
+            <Select
+              value={period}
+              label="Period"
+              onChange={(e) => setPeriod(e.target.value)}
+              disabled={loading}
+            >
+              <MenuItem value="day">Today</MenuItem>
+              <MenuItem value="week">This Week</MenuItem>
+              <MenuItem value="month">This Month</MenuItem>
+              <MenuItem value="year">This Year</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            startIcon={<Refresh />}
+            onClick={fetchReportsData}
+            variant="outlined"
+            disabled={loading}
           >
-            <MenuItem value="day">Today</MenuItem>
-            <MenuItem value="week">This Week</MenuItem>
-            <MenuItem value="month">This Month</MenuItem>
-            <MenuItem value="year">This Year</MenuItem>
-          </Select>
-        </FormControl>
+            Refresh
+          </Button>
+        </Box>
       </Box>
 
       <Paper sx={{ mb: 3 }}>
@@ -131,91 +181,95 @@ export default function ReportsPage() {
 
       {/* Sales Overview Tab */}
       <TabPanel value={tabValue} index={0}>
-        {/* Summary Cards */}
-        <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3} mb={3}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Total Sales
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                KES 26,350
-              </Typography>
-              <Typography variant="body2" color="success.main">
-                +12% from last week
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Transactions
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                156
-              </Typography>
-              <Typography variant="body2" color="success.main">
-                +8% from last week
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Average Sale
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                KES 169
-              </Typography>
-              <Typography variant="body2" color="error.main">
-                -3% from last week
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Target Achievement
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                87%
-              </Typography>
-              <Typography variant="body2" color="info.main">
-                KES 3,150 to target
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
+        {salesOverview && (
+          <>
+            {/* Summary Cards */}
+            <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3} mb={3}>
+              <Card>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>
+                    Total Sales
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold">
+                    KES {salesOverview.totalSales.toLocaleString()}
+                  </Typography>
+                  <Typography variant="body2" color="success.main">
+                    {salesOverview.totalTransactions} transactions
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>
+                    Transactions
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold">
+                    {salesOverview.totalTransactions}
+                  </Typography>
+                  <Typography variant="body2" color="success.main">
+                    Total completed sales
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>
+                    Average Sale
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold">
+                    KES {Math.round(salesOverview.averageSale).toLocaleString()}
+                  </Typography>
+                  <Typography variant="body2" color="info.main">
+                    Per transaction
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent>
+                  <Typography color="text.secondary" gutterBottom>
+                    Target Achievement
+                  </Typography>
+                  <Typography variant="h4" fontWeight="bold">
+                    {Math.round(salesOverview.targetAchievement)}%
+                  </Typography>
+                  <Typography variant="body2" color={salesOverview.targetAchievement >= 80 ? "success.main" : "warning.main"}>
+                    {salesOverview.targetAchievement >= 80 ? "On track" : "Below target"}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
 
-        {/* Sales Chart */}
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Daily Sales vs Target
-          </Typography>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={salesData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line 
-                type="monotone" 
-                dataKey="sales" 
-                stroke="#8884d8" 
-                strokeWidth={2}
-                name="Actual Sales"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="target" 
-                stroke="#82ca9d" 
-                strokeDasharray="5 5"
-                name="Target"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </Paper>
+            {/* Sales Trend Chart */}
+            <Paper sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                Daily Sales Trend
+              </Typography>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={salesTrend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `KES ${value}`} />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="sales" 
+                    stroke="#8884d8" 
+                    strokeWidth={2}
+                    name="Actual Sales"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="target" 
+                    stroke="#82ca9d" 
+                    strokeDasharray="5 5"
+                    name="Target"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </Paper>
+          </>
+        )}
       </TabPanel>
 
       {/* Product Performance Tab */}
@@ -243,7 +297,7 @@ export default function ReportsPage() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip formatter={(value) => `KES ${value}`} />
                 </PieChart>
               </ResponsiveContainer>
             </Paper>
@@ -287,27 +341,22 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '12px' }}>Nike Air Max</td>
-                  <td style={{ padding: '12px' }}>Nike</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>45</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>KES 5,400</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>15</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '12px' }}>Adidas Ultraboost</td>
-                  <td style={{ padding: '12px' }}>Adidas</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>38</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>KES 5,320</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>22</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '12px' }}>Puma Suede Classic</td>
-                  <td style={{ padding: '12px' }}>Puma</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>28</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>KES 2,660</td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>8</td>
-                </tr>
+                {topProducts.slice(0, 5).map((product, index) => (
+                  <tr key={index} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                    <td style={{ padding: '12px' }}>{product.name}</td>
+                    <td style={{ padding: '12px' }}>{product.brand}</td>
+                    <td style={{ padding: '12px', textAlign: 'right' }}>{product.unitsSold}</td>
+                    <td style={{ padding: '12px', textAlign: 'right' }}>KES {product.revenue.toLocaleString()}</td>
+                    <td style={{ padding: '12px', textAlign: 'right' }}>{product.stock}</td>
+                  </tr>
+                ))}
+                {topProducts.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#666' }}>
+                      No product data available
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </Box>
@@ -316,61 +365,76 @@ export default function ReportsPage() {
 
       {/* Inventory Analysis Tab */}
       <TabPanel value={tabValue} index={2}>
-        <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3}>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Total Inventory Value
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                KES 125,000
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Across 450 items
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Low Stock Items
-              </Typography>
-              <Typography variant="h4" fontWeight="bold" color="warning.main">
-                12
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Need reordering
-              </Typography>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent>
-              <Typography color="text.secondary" gutterBottom>
-                Out of Stock
-              </Typography>
-              <Typography variant="h4" fontWeight="bold" color="error.main">
-                3
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Lost sales potential
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
+        {inventoryAnalysis && (
+          <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3}>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Total Inventory Value
+                </Typography>
+                <Typography variant="h4" fontWeight="bold">
+                  KES {inventoryAnalysis.totalValue.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Across {inventoryAnalysis.totalItems} items
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Low Stock Items
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="warning.main">
+                  {inventoryAnalysis.lowStockItems}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Need reordering
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Out of Stock
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="error.main">
+                  {inventoryAnalysis.outOfStockItems}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Lost sales potential
+                </Typography>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <Typography color="text.secondary" gutterBottom>
+                  Stock Health
+                </Typography>
+                <Typography variant="h4" fontWeight="bold" color="success.main">
+                  {Math.round(((inventoryAnalysis.totalItems - inventoryAnalysis.outOfStockItems) / inventoryAnalysis.totalItems) * 100)}%
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Items in stock
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
       </TabPanel>
 
       {/* Financial Summary Tab */}
       <TabPanel value={tabValue} index={3}>
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Revenue & Profit Trend
+            Revenue & Profit Trend (Last 6 Months)
           </Typography>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={monthlyTrend}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
-              <Tooltip />
+              <Tooltip formatter={(value) => `KES ${value}`} />
               <Legend />
               <Line 
                 type="monotone" 

@@ -21,15 +21,7 @@ import {
   PersonAdd,
 } from '@mui/icons-material';
 import { authService } from '../../services/authService';
-import { registerSchema } from '../../utils/validation';
-
-type RegisterFormData = {
-  username: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-  role?: string;
-};
+import { registerSchema, type RegisterFormData } from '../../utils/validation';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -47,16 +39,19 @@ export default function RegisterPage() {
   });
 
   const onSubmit = async (data: RegisterFormData) => {
-    setError('');
-    setLoading(true);
-
     try {
+      setError('');
+      setLoading(true);
+      console.log('🔄 Attempting registration for user:', data.username);
+
       const response = await authService.register({
         username: data.username,
         email: data.email,
         password: data.password,
         role: data.role || 'staff',
       });
+
+      console.log('✅ Registration successful:', response);
       
       // Automatically log in after registration
       localStorage.setItem('token', response.access_token);
@@ -64,7 +59,8 @@ export default function RegisterPage() {
       
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      console.error('❌ Registration failed:', err);
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -126,6 +122,7 @@ export default function RegisterPage() {
               helperText={errors.username?.message}
               margin="normal"
               autoFocus
+              disabled={loading}
             />
             
             <TextField
@@ -136,6 +133,7 @@ export default function RegisterPage() {
               error={!!errors.email}
               helperText={errors.email?.message}
               margin="normal"
+              disabled={loading}
             />
             
             <TextField
@@ -146,12 +144,14 @@ export default function RegisterPage() {
               error={!!errors.password}
               helperText={errors.password?.message}
               margin="normal"
+              disabled={loading}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
                       onClick={() => setShowPassword(!showPassword)}
                       edge="end"
+                      disabled={loading}
                     >
                       {showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -168,12 +168,14 @@ export default function RegisterPage() {
               error={!!errors.confirmPassword}
               helperText={errors.confirmPassword?.message}
               margin="normal"
+              disabled={loading}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       edge="end"
+                      disabled={loading}
                     >
                       {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -189,6 +191,7 @@ export default function RegisterPage() {
               defaultValue="staff"
               {...register('role')}
               margin="normal"
+              disabled={loading}
             >
               <MenuItem value="staff">Staff</MenuItem>
               <MenuItem value="admin">Admin</MenuItem>
