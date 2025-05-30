@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import config
@@ -8,20 +8,22 @@ from routes.products import products_bp
 from routes.inventory import inventory_bp
 from routes.sales import sales_bp
 from routes.categories import categories_bp
-from flask import Flask
-from flask import request
-
 
 def create_app(config_name='default'):
     app = Flask(__name__)
-    CORS(app, origins="http://localhost:5174", supports_credentials=True)
     app.config.from_object(config[config_name])
+    
+    # CORS configuration
+    CORS(app)
+    app.after_request(add_cors_headers)
+    
+    # Disable strict slashes
+    app.url_map.strict_slashes = False
     
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
     JWTManager(app)
-    CORS(app)
     
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -36,41 +38,26 @@ def create_app(config_name='default'):
             "message": "SmartShoe API Running ✅", 
             "database": "Connected",
             "version": "1.0.0",
-            "endpoints": {
-                "authentication": [
-                    "/api/auth/register", 
-                    "/api/auth/login"
-                ],
-                "products": [
-                    "GET/POST /api/products",
-                    "GET/PUT/DELETE /api/products/{id}"
-                ],
-                "inventory": [
-                    "POST /api/inventory/stock-in",
-                    "GET /api/inventory/transactions"
-                ],
-                "sales": [
-                    "GET/POST /api/sales",
-                    "GET /api/sales/{id}"
-                ]
-            },
             "status": "All systems operational"
         })
     
-    @app.route('/health')
-    def health_check():
-        return jsonify({
-            "status": "healthy",
-            "database": "connected",
-            "timestamp": db.func.now()
-        })
+    @app.route('/test-cors', methods=['GET', 'POST', 'OPTIONS'])
+    def test_cors():
+        print(f"Test CORS - Method: {request.method}")
+        return jsonify({"message": "CORS test working", "method": request.method})
     
     return app
+
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:5173'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+    return response
 
 if __name__ == '__main__':
     app = create_app()
     with app.app_context():
-        # Import models to register them
         from models.user import User
         from models.product import Product
         from models.inventory import InventoryItem
@@ -78,12 +65,7 @@ if __name__ == '__main__':
         
         db.create_all()
         print("✅ Database tables created!")
-        print("🚀 SmartShoe Inventory API starting...")
-        print("📊 Available endpoints:")
-        print("   - Authentication: /api/auth/register, /api/auth/login")
-        print("   - Products: /api/products")
-        print("   - Inventory: /api/inventory/stock-in, /api/inventory/transactions")
-        print("   - Sales: /api/sales")
-        print("🌐 Server running at: http://localhost:5000")
+        print("🚀 Server starting on http://localhost:5000")
+        print("🔗 CORS enabled for http://localhost:5173")
     
-    app.run(debug=True)
+    app.run(debug=True, host='127.0.0.1', port=5000)
