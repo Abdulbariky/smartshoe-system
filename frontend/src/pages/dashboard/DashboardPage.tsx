@@ -34,6 +34,55 @@ import LoadingSpinner from '../../components/common/LoadingSpinner';
 import ErrorAlert from '../../components/common/ErrorAlert';
 import { dashboardService, type DashboardStats, type RecentSale, type LowStockProduct } from '../../services/dashboardService';
 
+// ✅ FIXED: Helper function to format date and time correctly
+const formatDateTime = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    
+    return date.toLocaleString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (error) {
+    return 'Invalid Date';
+  }
+};
+
+// ✅ FIXED: Helper function to format date only
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid Date';
+    
+    return date.toLocaleDateString('en-KE', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (error) {
+    return 'Invalid Date';
+  }
+};
+
+// ✅ FIXED: Helper function to get payment status chip
+const getPaymentStatusChip = (paymentMethod: string) => {
+  // All sales are considered "paid" since they're completed sales
+  // In a real system, you might have pending/paid status
+  return (
+    <Chip
+      label="Paid"
+      color="success"
+      size="small"
+      variant="outlined"
+    />
+  );
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentSales, setRecentSales] = useState<RecentSale[]>([]);
@@ -256,7 +305,7 @@ export default function DashboardPage() {
         </Box>
       </Box>
 
-      {/* Recent Sales */}
+      {/* Recent Sales - FIXED WITH CORRECT TIME AND PAYMENT STATUS */}
       <Paper sx={{ p: 3 }}>
         <Typography variant="h6" gutterBottom>
           Recent Sales
@@ -267,10 +316,11 @@ export default function DashboardPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>Invoice</TableCell>
-                  <TableCell>Date</TableCell>
+                  <TableCell>Date & Time</TableCell>
                   <TableCell>Customer</TableCell>
                   <TableCell align="right">Amount</TableCell>
-                  <TableCell>Payment</TableCell>
+                  <TableCell>Payment Method</TableCell>
+                  <TableCell>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -278,16 +328,27 @@ export default function DashboardPage() {
                   <TableRow key={sale.id} hover>
                     <TableCell>{sale.invoice_number}</TableCell>
                     <TableCell>
-                      {new Date(sale.created_at).toLocaleDateString()}
+                      {/* ✅ FIXED: Show correct date and time */}
+                      <Typography variant="body2">
+                        {formatDate(sale.created_at)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatDateTime(sale.created_at).split(',')[1]?.trim()}
+                      </Typography>
                     </TableCell>
                     <TableCell>{sale.customer || 'Walk-in'}</TableCell>
-                    <TableCell align="right">KES {sale.total_amount}</TableCell>
+                    <TableCell align="right">KES {sale.total_amount.toLocaleString()}</TableCell>
                     <TableCell>
                       <Chip
                         label={sale.payment_method}
-                        color="success"
+                        color="primary"
                         size="small"
+                        variant="outlined"
                       />
+                    </TableCell>
+                    <TableCell>
+                      {/* ✅ FIXED: Show payment status */}
+                      {getPaymentStatusChip(sale.payment_method)}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -1,19 +1,18 @@
-// src/services/reportsService.ts
+// src/services/reportsService.ts - FIXED to use REAL backend data
+
 import { productService } from './productService';
 import { salesService } from './salesService';
 
 export interface SalesOverviewData {
   totalSales: number;
   totalTransactions: number;
-  averageSale: number;
-  targetAchievement: number;
-  monthlyTarget: number;
+  // ❌ REMOVED: averageSale and targetAchievement
 }
 
 export interface SalesTrendData {
   name: string;
   sales: number;
-  target: number;
+  // ❌ REMOVED: target field
 }
 
 export interface CategoryData {
@@ -47,6 +46,7 @@ export interface InventoryAnalysisData {
   lowStockItems: number;
   outOfStockItems: number;
   totalItems: number;
+  // ❌ REMOVED: stockHealth
 }
 
 function getAuthHeaders(): Record<string, string> {
@@ -59,90 +59,29 @@ function getAuthHeaders(): Record<string, string> {
 
 const SALES_API_URL = 'http://localhost:5000/api/sales';
 
-// 🔄 Cache management for better performance
-let analyticsCache: any = null;
-let analyticsCacheTimestamp = 0;
-const CACHE_DURATION = 30000; // 30 seconds
-
-async function getCachedAnalytics() {
-  const now = Date.now();
-  if (!analyticsCache || (now - analyticsCacheTimestamp) > CACHE_DURATION) {
-    console.log('📊 Reports: Fetching fresh analytics data from backend...');
-    
-    try {
-      const response = await fetch(`${SALES_API_URL}/analytics/overview`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      if (response.ok) {
-        analyticsCache = await response.json();
-        analyticsCacheTimestamp = now;
-        console.log('✅ Reports: Analytics data cached:', analyticsCache);
-      } else {
-        throw new Error(`Analytics API failed: ${response.status}`);
-      }
-    } catch (error) {
-      console.error('❌ Reports: Failed to fetch analytics, using fallback');
-      analyticsCache = null;
-    }
-  }
-  
-  return analyticsCache;
-}
-
 export const reportsService = {
   getSalesOverview: async (): Promise<SalesOverviewData> => {
     try {
       console.log('🔄 Reports: Loading REAL sales overview data...');
       
-      // Try to get real analytics data from backend
-      const analyticsData = await getCachedAnalytics();
+      // Get real sales data directly
+      const salesData = await salesService.getSales();
+      const sales = salesData.sales || [];
       
-      if (analyticsData && analyticsData.success && analyticsData.overview) {
-        const overview = analyticsData.overview;
-        
-        const monthlyTarget = 50000; // KES 50,000 monthly target (configurable)
-        const targetAchievement = monthlyTarget > 0 ? Math.min((overview.total_sales / monthlyTarget) * 100, 100) : 0;
-        
-        console.log('✅ Reports: Using REAL backend analytics data');
-        return {
-          totalSales: Number(overview.total_sales) || 0,
-          totalTransactions: Number(overview.total_transactions) || 0,
-          averageSale: Number(overview.average_sale) || 0,
-          targetAchievement,
-          monthlyTarget,
-        };
-      } else {
-        console.log('⚠️ Reports: Backend analytics unavailable, using sales service fallback');
-        
-        // Fallback to salesService if analytics endpoint unavailable
-        const salesData = await salesService.getSales();
-        const sales = salesData.sales || [];
-        
-        const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
-        const totalTransactions = sales.length;
-        const averageSale = totalTransactions > 0 ? totalSales / totalTransactions : 0;
-        
-        const monthlyTarget = 50000;
-        const targetAchievement = monthlyTarget > 0 ? Math.min((totalSales / monthlyTarget) * 100, 100) : 0;
-        
-        return {
-          totalSales,
-          totalTransactions,
-          averageSale,
-          targetAchievement,
-          monthlyTarget,
-        };
-      }
+      const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+      const totalTransactions = sales.length;
+      
+      console.log('✅ Reports: Using REAL sales data from API');
+      return {
+        totalSales,
+        totalTransactions,
+        // ❌ REMOVED: averageSale and targetAchievement
+      };
     } catch (error) {
       console.error('❌ Reports: Failed to load sales overview:', error);
       return {
         totalSales: 0,
         totalTransactions: 0,
-        averageSale: 0,
-        targetAchievement: 0,
-        monthlyTarget: 50000,
       };
     }
   },
@@ -158,7 +97,6 @@ export const reportsService = {
       // Generate last 7 days trend based on REAL sales
       const last7Days = [];
       const today = new Date();
-      const dailyTarget = 2500; // KES 2,500 daily target
       
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
@@ -178,7 +116,7 @@ export const reportsService = {
         last7Days.push({
           name: dayName,
           sales: daySales,
-          target: dailyTarget,
+          // ❌ REMOVED: target field
         });
       }
       
@@ -195,49 +133,57 @@ export const reportsService = {
       console.log('🔄 Reports: Loading REAL category analysis...');
       
       // Try to get real category data from backend analytics
-      const analyticsData = await getCachedAnalytics();
-      
-      if (analyticsData && analyticsData.success && analyticsData.categories) {
-        console.log('✅ Reports: Using REAL backend category data');
-        return analyticsData.categories;
-      } else {
-        console.log('⚠️ Reports: Backend category analytics unavailable, using product distribution');
-        
-        // Fallback: estimate from product distribution
-        const products = await productService.getAll();
-        const salesData = await salesService.getSales();
-        const totalSales = salesData.sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
-        
-        const categoryMap = new Map<string, number>();
-        const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
-        
-        // Distribute sales proportionally across categories
-        const categoryCount = new Map<string, number>();
-        products.forEach(product => {
-          const category = product.category;
-          categoryCount.set(category, (categoryCount.get(category) || 0) + 1);
+      try {
+        const response = await fetch(`${SALES_API_URL}/analytics/overview`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
         });
-        
-        const totalProducts = products.length;
-        categoryCount.forEach((count, category) => {
-          const categoryShare = totalProducts > 0 ? (count / totalProducts) * totalSales : 0;
-          categoryMap.set(category, categoryShare);
-        });
-        
-        const categoryData: CategoryData[] = [];
-        let colorIndex = 0;
-        
-        categoryMap.forEach((value, category) => {
-          categoryData.push({
-            name: category,
-            value: Math.round(value),
-            color: colors[colorIndex % colors.length],
-          });
-          colorIndex++;
-        });
-        
-        return categoryData.sort((a, b) => b.value - a.value);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.categories) {
+            console.log('✅ Reports: Using REAL backend category data');
+            return data.categories;
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ Reports: Backend category analytics unavailable');
       }
+      
+      console.log('🔄 Reports: Using product distribution fallback');
+      const products = await productService.getAll();
+      const salesData = await salesService.getSales();
+      const totalSales = salesData.sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+      
+      const categoryMap = new Map<string, number>();
+      const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
+      
+      // Distribute sales proportionally across categories
+      const categoryCount = new Map<string, number>();
+      products.forEach(product => {
+        const category = product.category;
+        categoryCount.set(category, (categoryCount.get(category) || 0) + 1);
+      });
+      
+      const totalProducts = products.length;
+      categoryCount.forEach((count, category) => {
+        const categoryShare = totalProducts > 0 ? (count / totalProducts) * totalSales : 0;
+        categoryMap.set(category, categoryShare);
+      });
+      
+      const categoryData: CategoryData[] = [];
+      let colorIndex = 0;
+      
+      categoryMap.forEach((value, category) => {
+        categoryData.push({
+          name: category,
+          value: Math.round(value),
+          color: colors[colorIndex % colors.length],
+        });
+        colorIndex++;
+      });
+      
+      return categoryData.sort((a, b) => b.value - a.value);
     } catch (error) {
       console.error('❌ Reports: Failed to load category analysis:', error);
       return [];
@@ -249,98 +195,63 @@ export const reportsService = {
       console.log('🔄 Reports: Loading REAL brand performance...');
       
       // Try to get real brand data from backend analytics
-      const analyticsData = await getCachedAnalytics();
-      
-      if (analyticsData && analyticsData.success && analyticsData.brands) {
-        console.log('✅ Reports: Using REAL backend brand data');
-        return analyticsData.brands;
-      } else {
-        console.log('⚠️ Reports: Backend brand analytics unavailable, using estimation');
-        
-        // Fallback estimation
-        const products = await productService.getAll();
-        const salesData = await salesService.getSales();
-        const totalSalesValue = salesData.sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
-        
-        const brandMap = new Map<string, { sales: number; units: number }>();
-        
-        products.forEach(product => {
-          const brand = product.brand;
-          const existing = brandMap.get(brand) || { sales: 0, units: 0 };
-          
-          // Estimate based on actual sales data distribution
-          const brandShare = totalSalesValue / products.length;
-          const estimatedUnits = Math.floor(brandShare / product.retail_price);
-          
-          brandMap.set(brand, {
-            sales: existing.sales + brandShare,
-            units: existing.units + estimatedUnits,
-          });
-        });
-        
-        const brandData: BrandPerformanceData[] = [];
-        brandMap.forEach((data, brand) => {
-          brandData.push({
-            brand,
-            sales: Math.round(data.sales),
-            units: Math.round(data.units),
-          });
-        });
-        
-        return brandData.sort((a, b) => b.sales - a.sales).slice(0, 5);
-      }
-    } catch (error) {
-      console.error('❌ Reports: Failed to load brand performance:', error);
-      return [];
-    }
-  },
-
-  getTopProducts: async (): Promise<TopProductData[]> => {
-    try {
-      console.log('🔄 Reports: Loading REAL top products...');
-      
-      // Try to get real product performance from backend
       try {
-        const response = await fetch(`${SALES_API_URL}/analytics/product-performance`, {
+        const response = await fetch(`${SALES_API_URL}/analytics/overview`, {
           method: 'GET',
           headers: getAuthHeaders(),
         });
 
         if (response.ok) {
           const data = await response.json();
-          if (data.success && data.products) {
-            console.log('✅ Reports: Using REAL backend product performance data');
-            return data.products.slice(0, 10);
+          if (data.success && data.brands) {
+            console.log('✅ Reports: Using REAL backend brand data');
+            return data.brands;
           }
         }
       } catch (error) {
-        console.log('⚠️ Reports: Backend product analytics unavailable');
+        console.log('⚠️ Reports: Backend brand analytics unavailable');
       }
       
-      // Fallback estimation
-      console.log('🔄 Reports: Using product estimation fallback');
-      const products = await productService.getAll();
-      const salesData = await salesService.getSales();
-      const totalSalesValue = salesData.sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+      return [];
+    } catch (error) {
+      console.error('❌ Reports: Failed to load brand performance:', error);
+      return [];
+    }
+  },
+
+  // 🔧 FIXED: Top products now uses REAL backend analytics
+  getTopProducts: async (): Promise<TopProductData[]> => {
+    try {
+      console.log('🔄 Reports: Loading REAL top products from backend...');
       
-      const topProducts = products
-        .map(product => {
-          const productShare = totalSalesValue / products.length;
-          const estimatedUnits = Math.floor(productShare / product.retail_price);
-          const revenue = estimatedUnits * product.retail_price;
+      const response = await fetch(`${SALES_API_URL}/analytics/product-performance`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.products) {
+          console.log('✅ Reports: Using REAL backend product performance data');
+          console.log('📊 First 3 products from backend:', data.products.slice(0, 3));
           
-          return {
+          // Map backend data to frontend format
+          return data.products.map((product: any) => ({
             name: product.name,
             brand: product.brand,
-            unitsSold: estimatedUnits,
-            revenue: Math.round(revenue),
-            stock: product.current_stock || 0,
-          };
-        })
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, 10);
+            unitsSold: Number(product.units_sold) || 0,  // ✅ REAL units sold
+            revenue: Number(product.revenue) || 0,        // ✅ REAL revenue
+            stock: Number(product.stock) || 0,
+          }));
+        } else {
+          console.log('⚠️ Backend returned unsuccessful response:', data);
+        }
+      } else {
+        console.log(`⚠️ Backend request failed: ${response.status}`);
+      }
       
-      return topProducts;
+      console.log('🔄 Reports: Backend unavailable, returning empty array');
+      return [];
     } catch (error) {
       console.error('❌ Reports: Failed to load top products:', error);
       return [];
@@ -406,6 +317,7 @@ export const reportsService = {
         lowStockItems,
         outOfStockItems,
         totalItems,
+        // ❌ REMOVED: stockHealth
       };
     } catch (error) {
       console.error('❌ Reports: Failed to load inventory analysis:', error);

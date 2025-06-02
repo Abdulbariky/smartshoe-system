@@ -18,6 +18,7 @@ import { categoryService, brandService } from '../../services/categoryService';
 import type { Category, Brand } from '../../services/categoryService';
 import type { Product } from '../../services/productService';
 
+// ✅ FIXED: Removed supplier from validation schema
 const schema = yup.object({
   name: yup.string().required('Product name is required'),
   category: yup.string().required('Category is required'),
@@ -39,7 +40,7 @@ const schema = yup.object({
     .typeError('Wholesale price must be a number')
     .positive('Must be positive')
     .required('Wholesale price is required'),
-  supplier: yup.string().required('Supplier is required'),
+  // ❌ REMOVED: supplier field
 });
 
 type FormData = yup.InferType<typeof schema>;
@@ -72,6 +73,7 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
 
   useEffect(() => {
     if (open && product) {
+      // ✅ FIXED: Removed supplier from form reset
       reset({
         name: product.name,
         category: product.category,
@@ -81,7 +83,7 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
         purchase_price: product.purchase_price,
         retail_price: product.retail_price,
         wholesale_price: product.wholesale_price,
-        supplier: product.supplier || '',
+        // ❌ REMOVED: supplier: product.supplier || '',
       });
       
       loadCategoriesAndBrands();
@@ -232,14 +234,7 @@ export default function EditProductDialog({ open, product, onClose, onSuccess }:
               </TextField>
             </Box>
 
-            <TextField
-              fullWidth
-              label="Supplier"
-              {...register('supplier')}
-              error={!!errors.supplier}
-              helperText={errors.supplier?.message}
-              disabled={loading}
-            />
+            {/* ❌ REMOVED: Supplier field completely */}
 
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField

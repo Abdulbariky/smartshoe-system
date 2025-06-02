@@ -4,7 +4,7 @@ from models import db
 from models.sale import Sale, SaleItem
 from models.inventory import InventoryItem
 from models.product import Product
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 sales_bp = Blueprint('sales', __name__)
@@ -95,7 +95,7 @@ def list_sales():
     
     return jsonify({'sales': result, 'count': len(result)}), 200
 
-# 🔧 FIXED: Get sale details with proper format expected by frontend
+# ✅ FIXED: Get sale details WITHOUT fake customer names
 @sales_bp.route('/<int:sale_id>', methods=['GET'])
 @jwt_required()
 def get_sale_details(sale_id):
@@ -127,8 +127,7 @@ def get_sale_details(sale_id):
             items.append(item_detail)
             print(f"📦 Added item: {product.name} x{sale_item.quantity}")
         
-        # 🎯 KEY FIX: Return data in the EXACT format the frontend expects
-        # Frontend expects the sale object directly, not wrapped in a "sale" key
+        # ✅ FIXED: Return data WITHOUT any customer name generation
         response_data = {
             'id': sale.id,
             'invoice_number': sale.invoice_number,
@@ -137,12 +136,11 @@ def get_sale_details(sale_id):
             'payment_method': sale.payment_method,
             'created_at': sale.created_at.isoformat(),
             'items_count': len(items),
-            'items': items,  # ✅ This is what frontend checks for
-            'customer_name': generate_customer_name(sale.id)  # Add customer name
+            'items': items
+            # ❌ NO customer_name field at all - let frontend handle it
         }
         
         print(f"✅ Backend: Returning {len(items)} items for sale {sale.invoice_number}")
-        print(f"📊 Response structure: {list(response_data.keys())}")
         
         return jsonify(response_data), 200
         
@@ -152,81 +150,100 @@ def get_sale_details(sale_id):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-# 🆕 Helper function to generate consistent customer names
-def generate_customer_name(sale_id):
-    """Generate a realistic customer name based on sale ID"""
-    import random
-    
-    # Set seed for consistent results
-    random.seed(sale_id)
-    
-    first_names = ['John', 'Mary', 'David', 'Sarah', 'Michael', 'Lisa', 'James', 'Jennifer', 'Robert', 'Michelle']
-    last_names = ['Kamau', 'Wanjiku', 'Ochieng', 'Akinyi', 'Mwangi', 'Njeri', 'Otieno', 'Wambui', 'Kiprotich', 'Chebet']
-    
-    # 30% chance of walk-in customer
-    if random.random() < 0.3:
-        return 'Walk-in Customer'
-    
-    first_name = random.choice(first_names)
-    last_name = random.choice(last_names)
-    return f"{first_name} {last_name}"
-
-# 🆕 Enhanced analytics endpoint
+# ✅ FIXED: Working product performance analytics with proper error handling
 @sales_bp.route('/analytics/product-performance', methods=['GET'])
 @jwt_required()
 def get_product_performance():
     try:
-        print("📊 Getting real product performance analytics...")
+        print("📊 Getting REAL product performance analytics...")
         
-        # Query actual sales data from database
-        query = """
-        SELECT 
-            p.id,
-            p.name,
-            p.brand,
-            COALESCE(SUM(si.quantity), 0) as total_quantity_sold,
-            COALESCE(SUM(si.quantity * si.unit_price), 0) as total_revenue
-        FROM products p
-        LEFT JOIN sale_items si ON p.id = si.product_id
-        GROUP BY p.id, p.name, p.brand
-        ORDER BY total_quantity_sold DESC
-        """
+        # First, let's check if we have sale_items at all
+        total_sale_items = db.session.query(SaleItem).count()
+        print(f"🔍 Total sale_items in database: {total_sale_items}")
         
-        result = db.session.execute(query)
-        products = []
+        if total_sale_items == 0:
+            print("⚠️ No sale_items found - returning all products with 0 sales")
+            # Return all products with zero sales
+            products = Product.query.all()
+            result = []
+            for product in products:
+                result.append({
+                    'id': product.id,
+                    'name': product.name,
+                    'brand': product.brand,
+                    'category': product.category,
+                    'retail_price': float(product.retail_price),
+                    'units_sold': 0,
+                    'revenue': 0,
+                    'stock': product.get_current_stock()
+                })
+            
+            return jsonify({
+                'success': True,
+                'products': result,
+                'note': 'No sales data found - showing all products with 0 sales'
+            }), 200
         
-        for row in result:
-            # Get current stock properly
-            product = Product.query.get(row[0])
+        # Use a simpler, more reliable query
+        print("🔍 Running product analytics query...")
+        
+        # Get products with sales
+        products_with_sales = db.session.query(
+            Product.id,
+            Product.name,
+            Product.brand,
+            Product.category,
+            Product.retail_price,
+            db.func.coalesce(db.func.sum(SaleItem.quantity), 0).label('total_units'),
+            db.func.coalesce(db.func.sum(SaleItem.quantity * SaleItem.unit_price), 0).label('total_revenue')
+        ).outerjoin(SaleItem, Product.id == SaleItem.product_id).group_by(
+            Product.id, Product.name, Product.brand, Product.category, Product.retail_price
+        ).all()
+        
+        result = []
+        for row in products_with_sales:
+            product = Product.query.get(row.id)
             current_stock = product.get_current_stock() if product else 0
             
-            products.append({
-                'id': row[0],
-                'name': row[1],
-                'brand': row[2],
-                'units_sold': int(row[3]) if row[3] else 0,
-                'revenue': float(row[4]) if row[4] else 0.0,
+            units_sold = int(row.total_units) if row.total_units else 0
+            revenue = float(row.total_revenue) if row.total_revenue else 0
+            
+            print(f"📦 {row.name}: {units_sold} units, KES {revenue}")
+            
+            result.append({
+                'id': row.id,
+                'name': row.name,
+                'brand': row.brand,
+                'category': row.category,
+                'retail_price': float(row.retail_price),
+                'units_sold': units_sold,
+                'revenue': revenue,
                 'stock': current_stock
             })
         
-        print(f"✅ Returning analytics for {len(products)} products")
+        # Sort by units sold descending
+        result.sort(key=lambda x: x['units_sold'], reverse=True)
+        
+        print(f"✅ Returning analytics for {len(result)} products")
         return jsonify({
             'success': True,
-            'products': products
+            'products': result
         }), 200
         
     except Exception as e:
         print(f"❌ Error getting product performance: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
-# 🆕 Enhanced sales analytics
+# ✅ FIXED: Working sales analytics
 @sales_bp.route('/analytics/overview', methods=['GET'])
 @jwt_required()
 def get_sales_analytics():
     try:
-        print("📊 Getting real sales analytics overview...")
+        print("📊 Getting sales analytics overview...")
         
-        # Get actual sales summary
+        # Get basic sales stats
         total_sales = db.session.query(db.func.sum(Sale.total_amount)).scalar() or 0
         total_transactions = Sale.query.count()
         
@@ -236,52 +253,45 @@ def get_sales_analytics():
             db.func.date(Sale.created_at) == today
         ).scalar() or 0
         
-        # Get sales by category (real data)
-        category_query = """
-        SELECT 
-            p.category,
-            SUM(si.quantity * si.unit_price) as revenue
-        FROM sale_items si
-        JOIN products p ON si.product_id = p.id
-        GROUP BY p.category
-        ORDER BY revenue DESC
-        """
+        print(f"✅ Basic stats: {total_transactions} transactions, KES {total_sales}")
         
-        category_result = db.session.execute(category_query)
+        # Try to get category analysis (with error handling)
         categories = []
-        colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d']
+        try:
+            category_results = db.session.query(
+                Product.category,
+                db.func.coalesce(db.func.sum(SaleItem.quantity * SaleItem.unit_price), 0).label('revenue')
+            ).outerjoin(SaleItem, Product.id == SaleItem.product_id).group_by(Product.category).all()
+            
+            colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d']
+            for i, row in enumerate(category_results):
+                categories.append({
+                    'name': row.category,
+                    'value': float(row.revenue),
+                    'color': colors[i % len(colors)]
+                })
+        except Exception as e:
+            print(f"⚠️ Category analysis failed: {e}")
         
-        for i, row in enumerate(category_result):
-            categories.append({
-                'name': row[0],
-                'value': float(row[1]),
-                'color': colors[i % len(colors)]
-            })
-        
-        # Get brand performance (real data)
-        brand_query = """
-        SELECT 
-            p.brand,
-            SUM(si.quantity * si.unit_price) as sales,
-            SUM(si.quantity) as units
-        FROM sale_items si
-        JOIN products p ON si.product_id = p.id
-        GROUP BY p.brand
-        ORDER BY sales DESC
-        LIMIT 5
-        """
-        
-        brand_result = db.session.execute(brand_query)
+        # Try to get brand analysis (with error handling)
         brands = []
-        
-        for row in brand_result:
-            brands.append({
-                'brand': row[0],
-                'sales': float(row[1]),
-                'units': int(row[2])
-            })
-        
-        print(f"✅ Analytics: {total_transactions} transactions, KES {total_sales}")
+        try:
+            brand_results = db.session.query(
+                Product.brand,
+                db.func.coalesce(db.func.sum(SaleItem.quantity * SaleItem.unit_price), 0).label('sales'),
+                db.func.coalesce(db.func.sum(SaleItem.quantity), 0).label('units')
+            ).outerjoin(SaleItem, Product.id == SaleItem.product_id).group_by(Product.brand).order_by(
+                db.func.sum(SaleItem.quantity * SaleItem.unit_price).desc()
+            ).limit(5).all()
+            
+            for row in brand_results:
+                brands.append({
+                    'brand': row.brand,
+                    'sales': float(row.sales),
+                    'units': int(row.units)
+                })
+        except Exception as e:
+            print(f"⚠️ Brand analysis failed: {e}")
         
         return jsonify({
             'success': True,
@@ -301,32 +311,111 @@ def get_sales_analytics():
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
 
-# 🆕 Debug endpoint to check sale data structure
-@sales_bp.route('/debug/<int:sale_id>', methods=['GET'])
+# ✅ FIXED: Debug endpoint to check sale items
+@sales_bp.route('/debug/sale-items', methods=['GET'])
 @jwt_required()
-def debug_sale(sale_id):
-    """Debug endpoint to see exact sale data structure"""
+def debug_sale_items():
+    """Debug endpoint to check what sale items exist in the database"""
     try:
-        sale = Sale.query.get_or_404(sale_id)
+        print("🐛 Debug: Checking sale items...")
         
-        debug_info = {
-            'sale_id': sale.id,
-            'invoice_number': sale.invoice_number,
-            'items_count_from_relationship': len(sale.items),
-            'sale_items_details': []
-        }
+        # Check if sale_items table exists and has data
+        total_sale_items = db.session.query(SaleItem).count()
+        total_sales = db.session.query(Sale).count()
         
-        for item in sale.items:
-            debug_info['sale_items_details'].append({
+        print(f"🔍 Total sales: {total_sales}")
+        print(f"🔍 Total sale_items: {total_sale_items}")
+        
+        # Get recent sale items
+        recent_items = db.session.query(SaleItem).join(Product).join(Sale).limit(10).all()
+        
+        sale_items = []
+        for item in recent_items:
+            sale_items.append({
                 'sale_item_id': item.id,
+                'sale_id': item.sale_id,
                 'product_id': item.product_id,
+                'product_name': item.product.name if item.product else 'Unknown',
                 'quantity': item.quantity,
-                'unit_price': item.unit_price,
-                'product_exists': item.product is not None,
-                'product_name': item.product.name if item.product else None
+                'unit_price': float(item.unit_price),
+                'invoice_number': item.sale.invoice_number if item.sale else 'Unknown',
+                'created_at': item.sale.created_at.isoformat() if item.sale and item.sale.created_at else None
             })
         
-        return jsonify(debug_info), 200
+        # Get summary by product
+        summary = []
+        try:
+            summary_results = db.session.query(
+                Product.name,
+                db.func.count(SaleItem.id).label('sale_count'),
+                db.func.sum(SaleItem.quantity).label('total_quantity'),
+                db.func.sum(SaleItem.quantity * SaleItem.unit_price).label('total_revenue')
+            ).join(SaleItem).group_by(Product.name).order_by(
+                db.func.sum(SaleItem.quantity).desc()
+            ).all()
+            
+            for row in summary_results:
+                summary.append({
+                    'product_name': row.name,
+                    'sale_count': row.sale_count,
+                    'total_quantity': int(row.total_quantity),
+                    'total_revenue': float(row.total_revenue)
+                })
+        except Exception as e:
+            print(f"⚠️ Summary query failed: {e}")
+        
+        return jsonify({
+            'success': True,
+            'total_sales': total_sales,
+            'total_sale_items': total_sale_items,
+            'sale_items': sale_items,
+            'summary_by_product': summary
+        }), 200
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(f"❌ Error in debug sale items: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+# ✅ FIXED: Sales trend endpoint
+@sales_bp.route('/analytics/sales-trend', methods=['GET'])
+@jwt_required()
+def get_sales_trend():
+    try:
+        print("📊 Getting sales trend...")
+        
+        # Get last 7 days of sales data
+        trend_data = []
+        today = datetime.now().date()
+        
+        for i in range(6, -1, -1):
+            date = today - timedelta(days=i)
+            day_name = date.strftime('%a')
+            
+            # Get sales for this day
+            daily_sales = db.session.query(db.func.sum(Sale.total_amount)).filter(
+                db.func.date(Sale.created_at) == date
+            ).scalar() or 0
+            
+            daily_transactions = db.session.query(db.func.count(Sale.id)).filter(
+                db.func.date(Sale.created_at) == date
+            ).scalar() or 0
+            
+            trend_data.append({
+                'name': day_name,
+                'sales': float(daily_sales),
+                'transactions': int(daily_transactions),
+                'date': date.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'trend': trend_data
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error getting sales trend: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500

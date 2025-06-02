@@ -116,7 +116,8 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
               <Typography variant="h6" gutterBottom>
                 Bill To:
               </Typography>
-              <Typography>{safeInvoiceData.customer_name || 'Walk-in Customer'}</Typography>
+              {/* ✅ FIXED: Always show "Walk-in Customer" */}
+              <Typography>Walk-in Customer</Typography>
               <Chip
                 label={safeInvoiceData.sale_type.toUpperCase()}
                 size="small"
@@ -185,8 +186,8 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
 
           {/* Total Section - Matching the user's screenshot */}
           <Box display="flex" justifyContent="flex-end" mb={3}>
-            <Box 
-              sx={{ 
+            <Box
+              sx={{
                 border: '1px solid',
                 borderColor: 'grey.300',
                 borderRadius: 1,
@@ -222,8 +223,8 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
         <Button onClick={onClose} startIcon={<Close />}>
           Close
         </Button>
-        <Button 
-          variant="contained" 
+        <Button
+          variant="contained"
           color="primary"
           startIcon={<Print />}
           onClick={() => handlePrint()}

@@ -28,7 +28,7 @@ export default function StockManagementDialog({
   onSuccess 
 }: StockManagementDialogProps) {
   const [quantity, setQuantity] = useState<number>(0);
-  const [batchNumber, setBatchNumber] = useState('');
+  // ❌ REMOVED: batchNumber state
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -46,7 +46,8 @@ export default function StockManagementDialog({
       await inventoryService.stockIn({
         product_id: product.id,
         quantity,
-        batch_number: batchNumber || `BATCH-${Date.now()}`,
+        // ✅ FIXED: Auto-generate batch number, don't ask user for it
+        batch_number: `BATCH-${Date.now()}`,
         notes: notes || `Stock added for ${product.name}`,
       });
 
@@ -55,7 +56,7 @@ export default function StockManagementDialog({
       
       // Reset form
       setQuantity(0);
-      setBatchNumber('');
+      // ❌ REMOVED: setBatchNumber('');
       setNotes('');
     } catch (err: any) {
       setError(err.message || 'Failed to add stock');
@@ -118,14 +119,7 @@ export default function StockManagementDialog({
             disabled={loading}
           />
 
-          <TextField
-            fullWidth
-            label="Batch Number (Optional)"
-            value={batchNumber}
-            onChange={(e) => setBatchNumber(e.target.value)}
-            placeholder="e.g., BATCH-2024-001"
-            disabled={loading}
-          />
+          {/* ❌ REMOVED: Batch Number field completely */}
 
           <TextField
             fullWidth

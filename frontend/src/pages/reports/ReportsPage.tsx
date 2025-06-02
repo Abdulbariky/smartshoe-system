@@ -222,11 +222,11 @@ export default function ReportsPage() {
         </Tabs>
       </Paper>
 
-      {/* Sales Overview Tab */}
+      {/* Sales Overview Tab - FIXED: Removed Target Achievement and Average Sales */}
       <TabPanel value={tabValue} index={0}>
         {salesOverview && (
           <>
-            {/* Summary Cards with Explanations */}
+            {/* Summary Cards - SIMPLIFIED */}
             <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3} mb={3}>
               <MetricCard
                 title="Total Sales"
@@ -235,20 +235,9 @@ export default function ReportsPage() {
                 explanation="Total revenue from all completed sales in your selected period. This includes both retail and wholesale sales."
               />
               
-              <MetricCard
-                title="Average Sale"
-                value={`KES ${Math.round(salesOverview.averageSale).toLocaleString()}`}
-                subtitle="Per transaction"
-                explanation="Average amount per sale transaction. Calculated as Total Sales ÷ Number of Transactions. Higher average indicates better sales performance."
-              />
+              {/* ❌ REMOVED: Average Sale card */}
               
-              <MetricCard
-                title="Target Achievement"
-                value={`${Math.round(salesOverview.targetAchievement)}%`}
-                subtitle={`Target: KES ${salesOverview.monthlyTarget.toLocaleString()}`}
-                explanation="Percentage of monthly sales target achieved. Target is set at KES 50,000 per month. Green = on track, Red = below target."
-                color={salesOverview.targetAchievement >= 80 ? "success" : "warning"}
-              />
+              {/* ❌ REMOVED: Target Achievement card */}
               
               <MetricCard
                 title="Transactions"
@@ -258,13 +247,13 @@ export default function ReportsPage() {
               />
             </Box>
 
-            {/* Sales Trend Chart with Explanation */}
+            {/* Sales Trend Chart - Updated to remove target line */}
             <Paper sx={{ p: 3 }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" gutterBottom>
-                  Daily Sales vs Target (Last 7 Days)
+                  Daily Sales Trend (Last 7 Days)
                 </Typography>
-                <Tooltip title="Shows actual daily sales compared to daily target of KES 2,500. Blue line = actual sales, Green dashed line = daily target." arrow>
+                <Tooltip title="Shows actual daily sales from your transaction data. Blue line represents real sales revenue." arrow>
                   <Info sx={{ color: 'text.secondary', cursor: 'help' }} />
                 </Tooltip>
               </Box>
@@ -280,20 +269,13 @@ export default function ReportsPage() {
                     dataKey="sales" 
                     stroke="#8884d8" 
                     strokeWidth={2}
-                    name="Actual Sales"
+                    name="Daily Sales"
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="target" 
-                    stroke="#82ca9d" 
-                    strokeDasharray="5 5"
-                    name="Daily Target (KES 2,500)"
-                  />
+                  {/* ❌ REMOVED: Target line */}
                 </LineChart>
               </ResponsiveContainer>
               <Typography variant="caption" color="text.secondary" mt={2} display="block">
-                📊 This chart shows your actual daily sales performance against a target of KES 2,500 per day. 
-                Days above the green line exceed target, days below need improvement.
+                📊 This chart shows your actual daily sales performance based on completed transactions in your database.
               </Typography>
             </Paper>
           </>
@@ -305,9 +287,9 @@ export default function ReportsPage() {
         <Alert severity="info" sx={{ mb: 3 }}>
           <Typography variant="body2">
             <strong>📊 Product Performance Metrics:</strong><br/>
-            • <strong>Units Sold:</strong> Estimated based on your actual sales data and product pricing<br/>
-            • <strong>Revenue:</strong> Calculated from actual sales transactions distributed across products<br/>
-            • <strong>Category Sales:</strong> Estimated distribution of sales across different shoe categories
+            • <strong>Units Sold:</strong> Actual number of units sold based on your sales data<br/>
+            • <strong>Revenue:</strong> Real revenue calculated from completed transactions<br/>
+            • <strong>Category Sales:</strong> Distribution of sales across different shoe categories
           </Typography>
         </Alert>
 
@@ -364,7 +346,7 @@ export default function ReportsPage() {
         {/* Top Products Table */}
         <Paper sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Top Selling Products (Estimated from Sales Data)
+            Top Selling Products
           </Typography>
           <Box sx={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -372,8 +354,8 @@ export default function ReportsPage() {
                 <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Product</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Brand</th>
-                  <th style={{ padding: '12px', textAlign: 'right' }}>Est. Units Sold</th>
-                  <th style={{ padding: '12px', textAlign: 'right' }}>Est. Revenue</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Units Sold</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Revenue</th>
                   <th style={{ padding: '12px', textAlign: 'right' }}>Current Stock</th>
                 </tr>
               </thead>
@@ -397,15 +379,10 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </Box>
-          <Typography variant="caption" color="text.secondary" mt={2} display="block">
-            💡 <strong>Note:</strong> Units sold and revenue are estimated based on your actual sales data, 
-            product pricing, and inventory levels. For more accurate tracking, each individual sale transaction 
-            would need to record specific products sold.
-          </Typography>
         </Paper>
       </TabPanel>
 
-      {/* Inventory Analysis Tab */}
+      {/* Inventory Analysis Tab - FIXED: Removed Stock Health */}
       <TabPanel value={tabValue} index={2}>
         {inventoryAnalysis && (
           <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3}>
@@ -432,13 +409,7 @@ export default function ReportsPage() {
               color="error"
             />
             
-            <MetricCard
-              title="Stock Health"
-              value={`${Math.round(((inventoryAnalysis.totalItems - inventoryAnalysis.outOfStockItems) / inventoryAnalysis.totalItems) * 100)}%`}
-              subtitle="Items in stock"
-              explanation="Percentage of products that have stock available. Higher percentage indicates better inventory management."
-              color="success"
-            />
+            {/* ❌ REMOVED: Stock Health card */}
           </Box>
         )}
       </TabPanel>

@@ -60,11 +60,10 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  
+
   // Stock In Form
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('');
   const [quantity, setQuantity] = useState<number>(0);
-  const [batchNumber, setBatchNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -76,12 +75,10 @@ export default function InventoryPage() {
     try {
       setLoading(true);
       setError('');
-      
       const [productsData, transactionsData] = await Promise.all([
         productService.getAll(),
         inventoryService.getTransactions()
       ]);
-      
       setProducts(productsData);
       setTransactions(transactionsData.transactions);
     } catch (err: any) {
@@ -104,11 +101,11 @@ export default function InventoryPage() {
     try {
       setSubmitting(true);
       setError('');
-      
+
       const stockInData: StockInRequest = {
         product_id: selectedProduct as number,
         quantity,
-        batch_number: batchNumber || undefined,
+        batch_number: `BATCH-${Date.now()}`, // ✅ Auto-generated
         notes: notes || undefined
       };
 
@@ -117,13 +114,10 @@ export default function InventoryPage() {
       // Reset form
       setSelectedProduct('');
       setQuantity(0);
-      setBatchNumber('');
       setNotes('');
       setSuccess(`Stock added successfully! New stock: ${response.new_stock}`);
-      
-      // Refresh data
+
       await fetchData();
-      
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       setError(err.message || 'Failed to add stock');
@@ -175,7 +169,8 @@ export default function InventoryPage() {
           <Typography variant="h6" gutterBottom>
             Add Stock
           </Typography>
-          
+
+          {/* ✅ UPDATED STOCK IN FORM */}
           <Box display="flex" flexDirection="column" gap={2} maxWidth={600}>
             <TextField
               select
@@ -201,13 +196,6 @@ export default function InventoryPage() {
               onChange={(e) => setQuantity(Number(e.target.value))}
               required
               inputProps={{ min: 1 }}
-            />
-
-            <TextField
-              label="Batch Number"
-              value={batchNumber}
-              onChange={(e) => setBatchNumber(e.target.value)}
-              placeholder="e.g., BATCH-2024-001"
             />
 
             <TextField
@@ -304,7 +292,7 @@ export default function InventoryPage() {
               {products.map((product) => {
                 const isLowStock = product.current_stock < 10;
                 const isOutOfStock = product.current_stock === 0;
-                
+
                 return (
                   <TableRow key={product.id}>
                     <TableCell>{product.name}</TableCell>
@@ -322,13 +310,13 @@ export default function InventoryPage() {
                     <TableCell align="center">
                       <Chip
                         label={
-                          isOutOfStock ? 'Out of Stock' : 
-                          isLowStock ? 'Low Stock' : 
+                          isOutOfStock ? 'Out of Stock' :
+                          isLowStock ? 'Low Stock' :
                           'In Stock'
                         }
                         color={
-                          isOutOfStock ? 'error' : 
-                          isLowStock ? 'warning' : 
+                          isOutOfStock ? 'error' :
+                          isLowStock ? 'warning' :
                           'success'
                         }
                         size="small"
