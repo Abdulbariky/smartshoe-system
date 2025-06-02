@@ -32,6 +32,14 @@ import { salesService, type CreateSaleRequest } from '../../services/salesServic
 import SalesHistory from '../../components/sales/SalesHistoryPage';
 import InvoiceDialog from '../../components/sales/InvoiceDialog';
 
+// Helper function for safe currency formatting
+const formatCurrency = (value: number | undefined | null): string => {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '0.00';
+  }
+  return Number(value).toFixed(2);
+};
+
 interface CartItem {
   product: Product;
   quantity: number;
@@ -156,8 +164,12 @@ export default function SalesPage() {
     setCart(cart.filter(item => item.product.id !== productId));
   };
 
+  // Updated calculateTotal function with safer handling
   const calculateTotal = () => {
-    return cart.reduce((total, item) => total + item.subtotal, 0);
+    return cart.reduce((total, item) => {
+      const itemSubtotal = Number(item.subtotal) || 0;
+      return total + itemSubtotal;
+    }, 0);
   };
 
   const completeSale = async () => {
@@ -354,8 +366,8 @@ export default function SalesPage() {
                               </IconButton>
                             </Box>
                           </TableCell>
-                          <TableCell align="right">KES {item.unitPrice.toFixed(2)}</TableCell>
-                          <TableCell align="right">KES {item.subtotal.toFixed(2)}</TableCell>
+                          <TableCell align="right">KES {formatCurrency(item.unitPrice)}</TableCell>
+                          <TableCell align="right">KES {formatCurrency(item.subtotal)}</TableCell>
                           <TableCell align="center">
                             <IconButton
                               size="small"
@@ -376,7 +388,7 @@ export default function SalesPage() {
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                   <Typography variant="h6">Total (No Tax)</Typography>
                   <Typography variant="h5" fontWeight="bold">
-                    KES {calculateTotal().toFixed(2)}
+                    KES {formatCurrency(calculateTotal())}
                   </Typography>
                 </Box>
 

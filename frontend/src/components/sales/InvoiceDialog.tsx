@@ -43,15 +43,44 @@ interface InvoiceDialogProps {
   invoiceData: InvoiceData | null;
 }
 
+// Helper function to safely format currency
+const formatCurrency = (value: number | undefined | null): string => {
+  if (value === null || value === undefined || isNaN(value)) {
+    return '0.00';
+  }
+  return Number(value).toFixed(2);
+};
+
+// Helper function to safely get numeric value
+const safeNumber = (value: any): number => {
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+};
+
 export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDialogProps) {
   const componentRef = useRef<HTMLDivElement>(null);
 
   const handlePrint = useReactToPrint({
     contentRef: componentRef,
     documentTitle: `Invoice-${invoiceData?.invoice_number || 'Document'}`,
+    onAfterPrint: () => {
+      console.log('✅ Invoice printed successfully');
+    },
   });
 
   if (!invoiceData) return null;
+
+  // Sanitize invoice data to ensure all numeric values are safe
+  const safeInvoiceData = {
+    ...invoiceData,
+    total: safeNumber(invoiceData.total),
+    items: (invoiceData.items || []).map(item => ({
+      ...item,
+      quantity: safeNumber(item.quantity),
+      unit_price: safeNumber(item.unit_price),
+      subtotal: safeNumber(item.subtotal),
+    }))
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -87,11 +116,11 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
               <Typography variant="h6" gutterBottom>
                 Bill To:
               </Typography>
-              <Typography>{invoiceData.customer_name || 'Walk-in Customer'}</Typography>
+              <Typography>{safeInvoiceData.customer_name || 'Walk-in Customer'}</Typography>
               <Chip
-                label={invoiceData.sale_type}
+                label={safeInvoiceData.sale_type.toUpperCase()}
                 size="small"
-                color={invoiceData.sale_type === 'retail' ? 'primary' : 'secondary'}
+                color={safeInvoiceData.sale_type === 'retail' ? 'primary' : 'secondary'}
                 sx={{ mt: 1 }}
               />
             </Box>
@@ -99,44 +128,79 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
               <Typography variant="h6" gutterBottom>
                 Invoice Details:
               </Typography>
-              <Typography>Invoice #: {invoiceData.invoice_number}</Typography>
-              <Typography>Date: {invoiceData.date}</Typography>
-              <Typography>Payment: {invoiceData.payment_method}</Typography>
+              <Typography>Invoice #: {safeInvoiceData.invoice_number || 'N/A'}</Typography>
+              <Typography>Date: {safeInvoiceData.date || new Date().toLocaleString()}</Typography>
+              <Typography>Payment: {safeInvoiceData.payment_method || 'Cash'}</Typography>
             </Box>
           </Box>
 
-          {/* Items Table */}
-          <TableContainer component={Paper} variant="outlined">
+          {/* Items Table - Matching the user's screenshot exactly */}
+          <TableContainer component={Paper} variant="outlined" sx={{ mb: 3 }}>
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.100' }}>
-                  <TableCell>Item</TableCell>
-                  <TableCell align="center">Quantity</TableCell>
-                  <TableCell align="right">Unit Price</TableCell>
-                  <TableCell align="right">Total</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', fontSize: '1rem' }}>Item</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>Quantity</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>Unit Price</TableCell>
+                  <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '1rem' }}>Total</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {invoiceData.items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.product_name}</TableCell>
-                    <TableCell align="center">{item.quantity}</TableCell>
-                    <TableCell align="right">KES {item.unit_price.toFixed(2)}</TableCell>
-                    <TableCell align="right">KES {item.subtotal.toFixed(2)}</TableCell>
+                {safeInvoiceData.items.map((item, index) => (
+                  <TableRow key={index} sx={{ '&:nth-of-type(even)': { bgcolor: 'grey.50' } }}>
+                    <TableCell sx={{ py: 2 }}>
+                      <Typography variant="body1">
+                        {item.product_name || 'Unknown Product'}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 2 }}>
+                      <Typography variant="body1">
+                        {item.quantity}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 2 }}>
+                      <Typography variant="body1">
+                        KES {formatCurrency(item.unit_price)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center" sx={{ py: 2 }}>
+                      <Typography variant="body1" fontWeight="medium">
+                        KES {formatCurrency(item.subtotal)}
+                      </Typography>
+                    </TableCell>
                   </TableRow>
                 ))}
+                {safeInvoiceData.items.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
+                      <Typography color="text.secondary">
+                        No items found
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
 
-          {/* Totals - No Tax */}
-          <Box mt={3} display="flex" justifyContent="flex-end">
-            <Box width={250}>
-              <Divider sx={{ my: 1 }} />
-              <Box display="flex" justifyContent="space-between">
-                <Typography variant="h6">Total:</Typography>
+          {/* Total Section - Matching the user's screenshot */}
+          <Box display="flex" justifyContent="flex-end" mb={3}>
+            <Box 
+              sx={{ 
+                border: '1px solid',
+                borderColor: 'grey.300',
+                borderRadius: 1,
+                p: 2,
+                minWidth: 250,
+                bgcolor: 'background.paper'
+              }}
+            >
+              <Box display="flex" justifyContent="space-between" alignItems="center">
                 <Typography variant="h6" fontWeight="bold">
-                  KES {invoiceData.total.toFixed(2)}
+                  Total:
+                </Typography>
+                <Typography variant="h5" fontWeight="bold" color="primary.main">
+                  KES {formatCurrency(safeInvoiceData.total)}
                 </Typography>
               </Box>
             </Box>
@@ -157,6 +221,14 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
       <DialogActions>
         <Button onClick={onClose} startIcon={<Close />}>
           Close
+        </Button>
+        <Button 
+          variant="contained" 
+          color="primary"
+          startIcon={<Print />}
+          onClick={() => handlePrint()}
+        >
+          Print Invoice
         </Button>
       </DialogActions>
     </Dialog>

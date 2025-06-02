@@ -57,45 +57,86 @@ function getAuthHeaders(): Record<string, string> {
   };
 }
 
-// Sales data cache to avoid multiple API calls
-let salesDataCache: any = null;
-let cacheTimestamp = 0;
+const SALES_API_URL = 'http://localhost:5000/api/sales';
+
+// 🔄 Cache management for better performance
+let analyticsCache: any = null;
+let analyticsCacheTimestamp = 0;
 const CACHE_DURATION = 30000; // 30 seconds
 
-async function getCachedSalesData() {
+async function getCachedAnalytics() {
   const now = Date.now();
-  if (!salesDataCache || (now - cacheTimestamp) > CACHE_DURATION) {
-    salesDataCache = await salesService.getSales();
-    cacheTimestamp = now;
+  if (!analyticsCache || (now - analyticsCacheTimestamp) > CACHE_DURATION) {
+    console.log('📊 Reports: Fetching fresh analytics data from backend...');
+    
+    try {
+      const response = await fetch(`${SALES_API_URL}/analytics/overview`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        analyticsCache = await response.json();
+        analyticsCacheTimestamp = now;
+        console.log('✅ Reports: Analytics data cached:', analyticsCache);
+      } else {
+        throw new Error(`Analytics API failed: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('❌ Reports: Failed to fetch analytics, using fallback');
+      analyticsCache = null;
+    }
   }
-  return salesDataCache;
+  
+  return analyticsCache;
 }
 
 export const reportsService = {
   getSalesOverview: async (): Promise<SalesOverviewData> => {
     try {
-      console.log('🔄 Loading sales overview data...');
+      console.log('🔄 Reports: Loading REAL sales overview data...');
       
-      const salesData = await getCachedSalesData();
-      const sales = salesData.sales || [];
+      // Try to get real analytics data from backend
+      const analyticsData = await getCachedAnalytics();
       
-      const totalSales = sales.reduce((sum: number, sale: any) => sum + sale.total_amount, 0);
-      const totalTransactions = sales.length;
-      const averageSale = totalTransactions > 0 ? totalSales / totalTransactions : 0;
-      
-      // Monthly target (you can adjust this)
-      const monthlyTarget = 50000; // KES 50,000 monthly target
-      const targetAchievement = monthlyTarget > 0 ? Math.min((totalSales / monthlyTarget) * 100, 100) : 0;
-      
-      return {
-        totalSales,
-        totalTransactions,
-        averageSale,
-        targetAchievement,
-        monthlyTarget,
-      };
+      if (analyticsData && analyticsData.success && analyticsData.overview) {
+        const overview = analyticsData.overview;
+        
+        const monthlyTarget = 50000; // KES 50,000 monthly target (configurable)
+        const targetAchievement = monthlyTarget > 0 ? Math.min((overview.total_sales / monthlyTarget) * 100, 100) : 0;
+        
+        console.log('✅ Reports: Using REAL backend analytics data');
+        return {
+          totalSales: Number(overview.total_sales) || 0,
+          totalTransactions: Number(overview.total_transactions) || 0,
+          averageSale: Number(overview.average_sale) || 0,
+          targetAchievement,
+          monthlyTarget,
+        };
+      } else {
+        console.log('⚠️ Reports: Backend analytics unavailable, using sales service fallback');
+        
+        // Fallback to salesService if analytics endpoint unavailable
+        const salesData = await salesService.getSales();
+        const sales = salesData.sales || [];
+        
+        const totalSales = sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+        const totalTransactions = sales.length;
+        const averageSale = totalTransactions > 0 ? totalSales / totalTransactions : 0;
+        
+        const monthlyTarget = 50000;
+        const targetAchievement = monthlyTarget > 0 ? Math.min((totalSales / monthlyTarget) * 100, 100) : 0;
+        
+        return {
+          totalSales,
+          totalTransactions,
+          averageSale,
+          targetAchievement,
+          monthlyTarget,
+        };
+      }
     } catch (error) {
-      console.error('❌ Failed to load sales overview:', error);
+      console.error('❌ Reports: Failed to load sales overview:', error);
       return {
         totalSales: 0,
         totalTransactions: 0,
@@ -108,12 +149,13 @@ export const reportsService = {
 
   getSalesTrend: async (): Promise<SalesTrendData[]> => {
     try {
-      console.log('🔄 Loading sales trend data...');
+      console.log('🔄 Reports: Loading REAL sales trend data...');
       
-      const salesData = await getCachedSalesData();
+      // Get actual sales data
+      const salesData = await salesService.getSales();
       const sales = salesData.sales || [];
       
-      // Generate last 7 days trend based on ACTUAL sales
+      // Generate last 7 days trend based on REAL sales
       const last7Days = [];
       const today = new Date();
       const dailyTarget = 2500; // KES 2,500 daily target
@@ -125,10 +167,13 @@ export const reportsService = {
         const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
         const dayString = date.toDateString();
         
-        // Calculate ACTUAL sales for this day
+        // Calculate REAL sales for this day from actual backend data
         const daySales = sales
-          .filter((sale: any) => new Date(sale.created_at).toDateString() === dayString)
-          .reduce((sum: number, sale: any) => sum + sale.total_amount, 0);
+          .filter((sale) => {
+            const saleDate = new Date(sale.created_at);
+            return saleDate.toDateString() === dayString;
+          })
+          .reduce((sum, sale) => sum + Number(sale.total_amount), 0);
         
         last7Days.push({
           name: dayName,
@@ -137,120 +182,149 @@ export const reportsService = {
         });
       }
       
+      console.log('✅ Reports: Generated trend from REAL sales data');
       return last7Days;
     } catch (error) {
-      console.error('❌ Failed to load sales trend:', error);
+      console.error('❌ Reports: Failed to load sales trend:', error);
       return [];
     }
   },
 
   getCategoryAnalysis: async (): Promise<CategoryData[]> => {
     try {
-      console.log('🔄 Loading category analysis...');
+      console.log('🔄 Reports: Loading REAL category analysis...');
       
-      const [products, salesData] = await Promise.all([
-        productService.getAll(),
-        getCachedSalesData()
-      ]);
+      // Try to get real category data from backend analytics
+      const analyticsData = await getCachedAnalytics();
       
-      const sales = salesData.sales || [];
-      
-      // Group sales by category (this is estimated since we don't have detailed sale items)
-      const categoryMap = new Map<string, number>();
-      const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
-      
-      // Estimate category sales based on product distribution
-      const totalSales = sales.reduce((sum: number, sale: any) => sum + sale.total_amount, 0);
-      
-      products.forEach((product: any) => {
-        const category = product.category;
-        const existing = categoryMap.get(category) || 0;
+      if (analyticsData && analyticsData.success && analyticsData.categories) {
+        console.log('✅ Reports: Using REAL backend category data');
+        return analyticsData.categories;
+      } else {
+        console.log('⚠️ Reports: Backend category analytics unavailable, using product distribution');
         
-        // Estimate this category's share based on product count and pricing
-        const categoryShare = (product.retail_price / 1000) * 10; // Simple estimation
-        categoryMap.set(category, existing + categoryShare);
-      });
-      
-      const categoryData: CategoryData[] = [];
-      let colorIndex = 0;
-      
-      categoryMap.forEach((value, category) => {
-        categoryData.push({
-          name: category,
-          value: Math.round(value),
-          color: colors[colorIndex % colors.length],
+        // Fallback: estimate from product distribution
+        const products = await productService.getAll();
+        const salesData = await salesService.getSales();
+        const totalSales = salesData.sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
+        
+        const categoryMap = new Map<string, number>();
+        const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
+        
+        // Distribute sales proportionally across categories
+        const categoryCount = new Map<string, number>();
+        products.forEach(product => {
+          const category = product.category;
+          categoryCount.set(category, (categoryCount.get(category) || 0) + 1);
         });
-        colorIndex++;
-      });
-      
-      return categoryData.sort((a, b) => b.value - a.value);
+        
+        const totalProducts = products.length;
+        categoryCount.forEach((count, category) => {
+          const categoryShare = totalProducts > 0 ? (count / totalProducts) * totalSales : 0;
+          categoryMap.set(category, categoryShare);
+        });
+        
+        const categoryData: CategoryData[] = [];
+        let colorIndex = 0;
+        
+        categoryMap.forEach((value, category) => {
+          categoryData.push({
+            name: category,
+            value: Math.round(value),
+            color: colors[colorIndex % colors.length],
+          });
+          colorIndex++;
+        });
+        
+        return categoryData.sort((a, b) => b.value - a.value);
+      }
     } catch (error) {
-      console.error('❌ Failed to load category analysis:', error);
+      console.error('❌ Reports: Failed to load category analysis:', error);
       return [];
     }
   },
 
   getBrandPerformance: async (): Promise<BrandPerformanceData[]> => {
     try {
-      console.log('🔄 Loading brand performance...');
+      console.log('🔄 Reports: Loading REAL brand performance...');
       
-      const [products, salesData] = await Promise.all([
-        productService.getAll(),
-        getCachedSalesData()
-      ]);
+      // Try to get real brand data from backend analytics
+      const analyticsData = await getCachedAnalytics();
       
-      const sales = salesData.sales || [];
-      const totalSalesValue = sales.reduce((sum: number, sale: any) => sum + sale.total_amount, 0);
-      
-      // Group by brand and estimate performance
-      const brandMap = new Map<string, { sales: number; units: number }>();
-      
-      products.forEach((product: any) => {
-        const brand = product.brand;
-        const existing = brandMap.get(brand) || { sales: 0, units: 0 };
+      if (analyticsData && analyticsData.success && analyticsData.brands) {
+        console.log('✅ Reports: Using REAL backend brand data');
+        return analyticsData.brands;
+      } else {
+        console.log('⚠️ Reports: Backend brand analytics unavailable, using estimation');
         
-        // Estimate based on actual sales data
-        const brandShare = totalSalesValue / products.length; // Even distribution estimate
-        const estimatedUnits = Math.floor(brandShare / product.retail_price);
+        // Fallback estimation
+        const products = await productService.getAll();
+        const salesData = await salesService.getSales();
+        const totalSalesValue = salesData.sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
         
-        brandMap.set(brand, {
-          sales: existing.sales + brandShare,
-          units: existing.units + estimatedUnits,
+        const brandMap = new Map<string, { sales: number; units: number }>();
+        
+        products.forEach(product => {
+          const brand = product.brand;
+          const existing = brandMap.get(brand) || { sales: 0, units: 0 };
+          
+          // Estimate based on actual sales data distribution
+          const brandShare = totalSalesValue / products.length;
+          const estimatedUnits = Math.floor(brandShare / product.retail_price);
+          
+          brandMap.set(brand, {
+            sales: existing.sales + brandShare,
+            units: existing.units + estimatedUnits,
+          });
         });
-      });
-      
-      const brandData: BrandPerformanceData[] = [];
-      brandMap.forEach((data, brand) => {
-        brandData.push({
-          brand,
-          sales: Math.round(data.sales),
-          units: Math.round(data.units),
+        
+        const brandData: BrandPerformanceData[] = [];
+        brandMap.forEach((data, brand) => {
+          brandData.push({
+            brand,
+            sales: Math.round(data.sales),
+            units: Math.round(data.units),
+          });
         });
-      });
-      
-      return brandData.sort((a, b) => b.sales - a.sales).slice(0, 5);
+        
+        return brandData.sort((a, b) => b.sales - a.sales).slice(0, 5);
+      }
     } catch (error) {
-      console.error('❌ Failed to load brand performance:', error);
+      console.error('❌ Reports: Failed to load brand performance:', error);
       return [];
     }
   },
 
   getTopProducts: async (): Promise<TopProductData[]> => {
     try {
-      console.log('🔄 Loading top products...');
+      console.log('🔄 Reports: Loading REAL top products...');
       
-      const [products, salesData] = await Promise.all([
-        productService.getAll(),
-        getCachedSalesData()
-      ]);
+      // Try to get real product performance from backend
+      try {
+        const response = await fetch(`${SALES_API_URL}/analytics/product-performance`, {
+          method: 'GET',
+          headers: getAuthHeaders(),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.products) {
+            console.log('✅ Reports: Using REAL backend product performance data');
+            return data.products.slice(0, 10);
+          }
+        }
+      } catch (error) {
+        console.log('⚠️ Reports: Backend product analytics unavailable');
+      }
       
-      const sales = salesData.sales || [];
-      const totalSalesValue = sales.reduce((sum: number, sale: any) => sum + sale.total_amount, 0);
+      // Fallback estimation
+      console.log('🔄 Reports: Using product estimation fallback');
+      const products = await productService.getAll();
+      const salesData = await salesService.getSales();
+      const totalSalesValue = salesData.sales.reduce((sum, sale) => sum + Number(sale.total_amount), 0);
       
-      // Calculate performance based on ACTUAL sales data
       const topProducts = products
-        .map((product: any) => {
-          // Estimate units sold based on price and total sales
+        .map(product => {
           const productShare = totalSalesValue / products.length;
           const estimatedUnits = Math.floor(productShare / product.retail_price);
           const revenue = estimatedUnits * product.retail_price;
@@ -268,19 +342,19 @@ export const reportsService = {
       
       return topProducts;
     } catch (error) {
-      console.error('❌ Failed to load top products:', error);
+      console.error('❌ Reports: Failed to load top products:', error);
       return [];
     }
   },
 
   getMonthlyTrend: async (): Promise<MonthlyTrendData[]> => {
     try {
-      console.log('🔄 Loading monthly trend...');
+      console.log('🔄 Reports: Loading REAL monthly trend...');
       
-      const salesData = await getCachedSalesData();
+      const salesData = await salesService.getSales();
       const sales = salesData.sales || [];
       
-      // Generate last 6 months trend based on ACTUAL sales
+      // Generate last 6 months trend based on REAL sales
       const months = [];
       const today = new Date();
       
@@ -291,11 +365,11 @@ export const reportsService = {
         const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0);
         
         const monthSales = sales
-          .filter((sale: any) => {
+          .filter(sale => {
             const saleDate = new Date(sale.created_at);
             return saleDate >= monthStart && saleDate <= monthEnd;
           })
-          .reduce((sum: number, sale: any) => sum + sale.total_amount, 0);
+          .reduce((sum, sale) => sum + Number(sale.total_amount), 0);
         
         const revenue = monthSales;
         const profit = revenue * 0.3; // Assume 30% profit margin
@@ -307,24 +381,26 @@ export const reportsService = {
         });
       }
       
+      console.log('✅ Reports: Generated monthly trend from REAL sales data');
       return months;
     } catch (error) {
-      console.error('❌ Failed to load monthly trend:', error);
+      console.error('❌ Reports: Failed to load monthly trend:', error);
       return [];
     }
   },
 
   getInventoryAnalysis: async (): Promise<InventoryAnalysisData> => {
     try {
-      console.log('🔄 Loading inventory analysis...');
+      console.log('🔄 Reports: Loading REAL inventory analysis...');
       
       const products = await productService.getAll();
       
       const totalItems = products.length;
-      const lowStockItems = products.filter((p: any) => (p.current_stock || 0) < 10).length;
-      const outOfStockItems = products.filter((p: any) => (p.current_stock || 0) === 0).length;
-      const totalValue = products.reduce((sum: number, p: any) => sum + ((p.current_stock || 0) * p.purchase_price), 0);
+      const lowStockItems = products.filter(p => (p.current_stock || 0) < 10).length;
+      const outOfStockItems = products.filter(p => (p.current_stock || 0) === 0).length;
+      const totalValue = products.reduce((sum, p) => sum + ((p.current_stock || 0) * p.purchase_price), 0);
       
+      console.log('✅ Reports: Generated REAL inventory analysis');
       return {
         totalValue: Math.round(totalValue),
         lowStockItems,
@@ -332,7 +408,7 @@ export const reportsService = {
         totalItems,
       };
     } catch (error) {
-      console.error('❌ Failed to load inventory analysis:', error);
+      console.error('❌ Reports: Failed to load inventory analysis:', error);
       return {
         totalValue: 0,
         lowStockItems: 0,
