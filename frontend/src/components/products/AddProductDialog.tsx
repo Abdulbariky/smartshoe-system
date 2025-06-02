@@ -38,10 +38,12 @@ const schema = yup.object({
     .typeError('Wholesale price must be a number')
     .positive('Must be positive')
     .required('Wholesale price is required'),
-  supplier: yup.string().required('Supplier is required'),
 });
 
 type FormData = yup.InferType<typeof schema>;
+
+// Create a type for the API call that includes SKU and supplier
+type ProductCreateData = FormData & { sku: string; supplier: string };
 
 interface AddProductDialogProps {
   open: boolean;
@@ -104,13 +106,14 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
       setError('');
       console.log('🔄 Adding product:', data);
 
-      // Add the product with sku (backend will generate if not provided)
-      const productData = {
+      // Create product data with auto-generated SKU and default supplier
+      const productData: ProductCreateData = {
         ...data,
-        sku: '', // Backend will auto-generate if empty
+        sku: '', // Backend will generate automatically
+        supplier: '', // Default empty supplier
       };
 
-      await productService.add(productData);
+      await productService.add(productData as any); // Type assertion for now
       console.log('✅ Product added successfully');
 
       reset();
@@ -224,15 +227,6 @@ export default function AddProductDialog({ open, onClose, onSuccess }: AddProduc
                 ))}
               </TextField>
             </Box>
-
-            <TextField
-              fullWidth
-              label="Supplier"
-              {...register('supplier')}
-              error={!!errors.supplier}
-              helperText={errors.supplier?.message}
-              disabled={loading}
-            />
 
             <Box sx={{ display: 'flex', gap: 2 }}>
               <TextField

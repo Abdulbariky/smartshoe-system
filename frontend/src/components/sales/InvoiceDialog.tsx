@@ -33,8 +33,6 @@ interface InvoiceData {
   customer_name?: string;
   sale_type: 'retail' | 'wholesale';
   items: InvoiceItem[];
-  subtotal: number;
-  tax: number;
   total: number;
   payment_method: string;
 }
@@ -74,10 +72,10 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
               SMARTSHOE
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              123 Business Street, City, State 12345
+              123 Business Street, Nairobi, Kenya
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Phone: (555) 123-4567 | Email: info@smartshoe.com
+              Phone: +254 700 123 456 | Email: info@smartshoe.com
             </Typography>
           </Box>
 
@@ -131,17 +129,9 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
             </Table>
           </TableContainer>
 
-          {/* Totals */}
+          {/* Totals - No Tax */}
           <Box mt={3} display="flex" justifyContent="flex-end">
             <Box width={250}>
-              <Box display="flex" justifyContent="space-between" mb={1}>
-                <Typography>Subtotal:</Typography>
-                <Typography>KES {invoiceData.subtotal.toFixed(2)}</Typography>
-              </Box>
-              <Box display="flex" justifyContent="space-between" mb={1}>
-                <Typography>Tax (10%):</Typography>
-                <Typography>KES {invoiceData.tax.toFixed(2)}</Typography>
-              </Box>
               <Divider sx={{ my: 1 }} />
               <Box display="flex" justifyContent="space-between">
                 <Typography variant="h6">Total:</Typography>
@@ -156,6 +146,9 @@ export default function InvoiceDialog({ open, onClose, invoiceData }: InvoiceDia
           <Box mt={4} textAlign="center">
             <Typography variant="body2" color="text.secondary">
               Thank you for your business!
+            </Typography>
+            <Typography variant="caption" color="text.secondary" mt={1} display="block">
+              This is a computer-generated invoice.
             </Typography>
           </Box>
         </Box>

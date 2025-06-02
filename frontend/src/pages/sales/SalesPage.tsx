@@ -180,10 +180,8 @@ export default function SalesPage() {
 
       const response = await salesService.createSale(saleData);
 
-      // Create invoice data for dialog
-      const subtotal = calculateTotal();
-      const tax = subtotal * 0.1; // 10% tax
-      const total = subtotal + tax;
+      // Create invoice data for dialog - NO TAX
+      const total = calculateTotal();
 
       const invoiceData = {
         invoice_number: response.invoice_number,
@@ -195,9 +193,7 @@ export default function SalesPage() {
           unit_price: item.unitPrice,
           subtotal: item.subtotal,
         })),
-        subtotal,
-        tax,
-        total,
+        total, // No tax added
         payment_method: 'cash',
       };
 
@@ -378,7 +374,7 @@ export default function SalesPage() {
                 <Divider sx={{ my: 2 }} />
 
                 <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6">Total</Typography>
+                  <Typography variant="h6">Total (No Tax)</Typography>
                   <Typography variant="h5" fontWeight="bold">
                     KES {calculateTotal().toFixed(2)}
                   </Typography>

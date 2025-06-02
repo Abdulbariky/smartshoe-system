@@ -13,6 +13,7 @@ import {
   InputLabel,
   Button,
   Alert,
+  Tooltip,
 } from '@mui/material';
 import {
   LineChart,
@@ -25,7 +26,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
 } from 'recharts';
@@ -35,6 +36,7 @@ import {
   Inventory,
   AttachMoney,
   Refresh,
+  Info,
 } from '@mui/icons-material';
 import { reportsService } from '../../services/reportsService';
 import type {
@@ -67,6 +69,47 @@ function TabPanel(props: TabPanelProps) {
     >
       {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
     </div>
+  );
+}
+
+function MetricCard({ 
+  title, 
+  value, 
+  subtitle, 
+  explanation, 
+  color = 'primary' 
+}: { 
+  title: string; 
+  value: string | number; 
+  subtitle?: string; 
+  explanation: string;
+  color?: string;
+}) {
+  return (
+    <Card>
+      <CardContent>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Box display="flex" alignItems="center" gap={1}>
+              <Typography color="text.secondary" gutterBottom>
+                {title}
+              </Typography>
+              <Tooltip title={explanation} arrow>
+                <Info sx={{ fontSize: 16, color: 'text.secondary', cursor: 'help' }} />
+              </Tooltip>
+            </Box>
+            <Typography variant="h4" fontWeight="bold">
+              {typeof value === 'number' ? value.toLocaleString() : value}
+            </Typography>
+            {subtitle && (
+              <Typography variant="body2" color="text.secondary" mt={1}>
+                {subtitle}
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -183,73 +226,54 @@ export default function ReportsPage() {
       <TabPanel value={tabValue} index={0}>
         {salesOverview && (
           <>
-            {/* Summary Cards */}
+            {/* Summary Cards with Explanations */}
             <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3} mb={3}>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Total Sales
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold">
-                    KES {salesOverview.totalSales.toLocaleString()}
-                  </Typography>
-                  <Typography variant="body2" color="success.main">
-                    {salesOverview.totalTransactions} transactions
-                  </Typography>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Transactions
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold">
-                    {salesOverview.totalTransactions}
-                  </Typography>
-                  <Typography variant="body2" color="success.main">
-                    Total completed sales
-                  </Typography>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Average Sale
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold">
-                    KES {Math.round(salesOverview.averageSale).toLocaleString()}
-                  </Typography>
-                  <Typography variant="body2" color="info.main">
-                    Per transaction
-                  </Typography>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent>
-                  <Typography color="text.secondary" gutterBottom>
-                    Target Achievement
-                  </Typography>
-                  <Typography variant="h4" fontWeight="bold">
-                    {Math.round(salesOverview.targetAchievement)}%
-                  </Typography>
-                  <Typography variant="body2" color={salesOverview.targetAchievement >= 80 ? "success.main" : "warning.main"}>
-                    {salesOverview.targetAchievement >= 80 ? "On track" : "Below target"}
-                  </Typography>
-                </CardContent>
-              </Card>
+              <MetricCard
+                title="Total Sales"
+                value={`KES ${salesOverview.totalSales.toLocaleString()}`}
+                subtitle={`${salesOverview.totalTransactions} transactions`}
+                explanation="Total revenue from all completed sales in your selected period. This includes both retail and wholesale sales."
+              />
+              
+              <MetricCard
+                title="Average Sale"
+                value={`KES ${Math.round(salesOverview.averageSale).toLocaleString()}`}
+                subtitle="Per transaction"
+                explanation="Average amount per sale transaction. Calculated as Total Sales ÷ Number of Transactions. Higher average indicates better sales performance."
+              />
+              
+              <MetricCard
+                title="Target Achievement"
+                value={`${Math.round(salesOverview.targetAchievement)}%`}
+                subtitle={`Target: KES ${salesOverview.monthlyTarget.toLocaleString()}`}
+                explanation="Percentage of monthly sales target achieved. Target is set at KES 50,000 per month. Green = on track, Red = below target."
+                color={salesOverview.targetAchievement >= 80 ? "success" : "warning"}
+              />
+              
+              <MetricCard
+                title="Transactions"
+                value={salesOverview.totalTransactions}
+                subtitle="Total completed sales"
+                explanation="Number of individual sales transactions completed. Each sale, regardless of amount, counts as one transaction."
+              />
             </Box>
 
-            {/* Sales Trend Chart */}
+            {/* Sales Trend Chart with Explanation */}
             <Paper sx={{ p: 3 }}>
-              <Typography variant="h6" gutterBottom>
-                Daily Sales Trend
-              </Typography>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" gutterBottom>
+                  Daily Sales vs Target (Last 7 Days)
+                </Typography>
+                <Tooltip title="Shows actual daily sales compared to daily target of KES 2,500. Blue line = actual sales, Green dashed line = daily target." arrow>
+                  <Info sx={{ color: 'text.secondary', cursor: 'help' }} />
+                </Tooltip>
+              </Box>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={salesTrend}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="name" />
                   <YAxis />
-                  <Tooltip formatter={(value) => `KES ${value}`} />
+                  <RechartsTooltip formatter={(value) => `KES ${value}`} />
                   <Legend />
                   <Line 
                     type="monotone" 
@@ -263,10 +287,14 @@ export default function ReportsPage() {
                     dataKey="target" 
                     stroke="#82ca9d" 
                     strokeDasharray="5 5"
-                    name="Target"
+                    name="Daily Target (KES 2,500)"
                   />
                 </LineChart>
               </ResponsiveContainer>
+              <Typography variant="caption" color="text.secondary" mt={2} display="block">
+                📊 This chart shows your actual daily sales performance against a target of KES 2,500 per day. 
+                Days above the green line exceed target, days below need improvement.
+              </Typography>
             </Paper>
           </>
         )}
@@ -274,6 +302,15 @@ export default function ReportsPage() {
 
       {/* Product Performance Tab */}
       <TabPanel value={tabValue} index={1}>
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            <strong>📊 Product Performance Metrics:</strong><br/>
+            • <strong>Units Sold:</strong> Estimated based on your actual sales data and product pricing<br/>
+            • <strong>Revenue:</strong> Calculated from actual sales transactions distributed across products<br/>
+            • <strong>Category Sales:</strong> Estimated distribution of sales across different shoe categories
+          </Typography>
+        </Alert>
+
         <Box display="flex" flexWrap="wrap" gap={3}>
           {/* Category Distribution */}
           <Box flex="1 1 400px">
@@ -297,7 +334,7 @@ export default function ReportsPage() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value) => `KES ${value}`} />
+                  <RechartsTooltip formatter={(value) => `KES ${value}`} />
                 </PieChart>
               </ResponsiveContainer>
             </Paper>
@@ -314,7 +351,7 @@ export default function ReportsPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="brand" />
                   <YAxis />
-                  <Tooltip />
+                  <RechartsTooltip />
                   <Legend />
                   <Bar dataKey="sales" fill="#8884d8" name="Sales (KES)" />
                   <Bar dataKey="units" fill="#82ca9d" name="Units Sold" />
@@ -327,7 +364,7 @@ export default function ReportsPage() {
         {/* Top Products Table */}
         <Paper sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Top Selling Products
+            Top Selling Products (Estimated from Sales Data)
           </Typography>
           <Box sx={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -335,9 +372,9 @@ export default function ReportsPage() {
                 <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Product</th>
                   <th style={{ padding: '12px', textAlign: 'left' }}>Brand</th>
-                  <th style={{ padding: '12px', textAlign: 'right' }}>Units Sold</th>
-                  <th style={{ padding: '12px', textAlign: 'right' }}>Revenue</th>
-                  <th style={{ padding: '12px', textAlign: 'right' }}>Stock</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Est. Units Sold</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Est. Revenue</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Current Stock</th>
                 </tr>
               </thead>
               <tbody>
@@ -360,6 +397,11 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </Box>
+          <Typography variant="caption" color="text.secondary" mt={2} display="block">
+            💡 <strong>Note:</strong> Units sold and revenue are estimated based on your actual sales data, 
+            product pricing, and inventory levels. For more accurate tracking, each individual sale transaction 
+            would need to record specific products sold.
+          </Typography>
         </Paper>
       </TabPanel>
 
@@ -367,58 +409,36 @@ export default function ReportsPage() {
       <TabPanel value={tabValue} index={2}>
         {inventoryAnalysis && (
           <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3}>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Total Inventory Value
-                </Typography>
-                <Typography variant="h4" fontWeight="bold">
-                  KES {inventoryAnalysis.totalValue.toLocaleString()}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Across {inventoryAnalysis.totalItems} items
-                </Typography>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Low Stock Items
-                </Typography>
-                <Typography variant="h4" fontWeight="bold" color="warning.main">
-                  {inventoryAnalysis.lowStockItems}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Need reordering
-                </Typography>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Out of Stock
-                </Typography>
-                <Typography variant="h4" fontWeight="bold" color="error.main">
-                  {inventoryAnalysis.outOfStockItems}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Lost sales potential
-                </Typography>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent>
-                <Typography color="text.secondary" gutterBottom>
-                  Stock Health
-                </Typography>
-                <Typography variant="h4" fontWeight="bold" color="success.main">
-                  {Math.round(((inventoryAnalysis.totalItems - inventoryAnalysis.outOfStockItems) / inventoryAnalysis.totalItems) * 100)}%
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Items in stock
-                </Typography>
-              </CardContent>
-            </Card>
+            <MetricCard
+              title="Total Inventory Value"
+              value={`KES ${inventoryAnalysis.totalValue.toLocaleString()}`}
+              subtitle={`Across ${inventoryAnalysis.totalItems} items`}
+              explanation="Total value of all products in stock, calculated as: (Current Stock × Purchase Price) for each product."
+            />
+            
+            <MetricCard
+              title="Low Stock Items"
+              value={inventoryAnalysis.lowStockItems}
+              subtitle="Need reordering"
+              explanation="Number of products with less than 10 items in stock. These products may run out soon and need restocking."
+              color="warning"
+            />
+            
+            <MetricCard
+              title="Out of Stock"
+              value={inventoryAnalysis.outOfStockItems}
+              subtitle="Lost sales potential"
+              explanation="Number of products with zero stock. These represent lost sales opportunities and should be restocked immediately."
+              color="error"
+            />
+            
+            <MetricCard
+              title="Stock Health"
+              value={`${Math.round(((inventoryAnalysis.totalItems - inventoryAnalysis.outOfStockItems) / inventoryAnalysis.totalItems) * 100)}%`}
+              subtitle="Items in stock"
+              explanation="Percentage of products that have stock available. Higher percentage indicates better inventory management."
+              color="success"
+            />
           </Box>
         )}
       </TabPanel>
@@ -426,32 +446,43 @@ export default function ReportsPage() {
       {/* Financial Summary Tab */}
       <TabPanel value={tabValue} index={3}>
         <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Revenue & Profit Trend (Last 6 Months)
-          </Typography>
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+            <Typography variant="h6" gutterBottom>
+              Revenue & Profit Trend (Last 6 Months)
+            </Typography>
+            <Tooltip title="Revenue is actual sales data. Profit is estimated at 30% of revenue (you can adjust this based on your actual profit margins)." arrow>
+              <Info sx={{ color: 'text.secondary', cursor: 'help' }} />
+            </Tooltip>
+          </Box>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={monthlyTrend}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
               <YAxis />
-              <Tooltip formatter={(value) => `KES ${value}`} />
+              <RechartsTooltip formatter={(value) => `KES ${value}`} />
               <Legend />
               <Line 
                 type="monotone" 
                 dataKey="revenue" 
                 stroke="#2563eb" 
                 strokeWidth={2}
-                name="Revenue"
+                name="Revenue (Actual Sales)"
               />
               <Line 
                 type="monotone" 
                 dataKey="profit" 
                 stroke="#10b981" 
                 strokeWidth={2}
-                name="Profit"
+                name="Estimated Profit (30%)"
               />
             </LineChart>
           </ResponsiveContainer>
+          <Typography variant="caption" color="text.secondary" mt={2} display="block">
+            💰 <strong>Financial Calculations:</strong><br/>
+            • <strong>Revenue:</strong> Your actual sales transactions from the database<br/>
+            • <strong>Profit:</strong> Estimated at 30% of revenue (adjust based on your actual margins)<br/>
+            • <strong>Calculation:</strong> Profit = Revenue × 0.30
+          </Typography>
         </Paper>
       </TabPanel>
     </Box>

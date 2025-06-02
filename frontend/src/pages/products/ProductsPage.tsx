@@ -31,6 +31,7 @@ import { productService } from '../../services/productService';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
 import AddProductDialog from '../../components/products/AddProductDialog';
 import EditProductDialog from '../../components/products/EditProductDialog';
+import StockManagementDialog from '../../components/products/StockManagementDialog';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -41,6 +42,7 @@ export default function ProductsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [stockDialogOpen, setStockDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // Pagination
@@ -101,6 +103,11 @@ export default function ProductsPage() {
     setEditDialogOpen(true);
   };
 
+  const handleManageStock = (product: Product) => {
+    setSelectedProduct(product);
+    setStockDialogOpen(true);
+  };
+
   const handleDeleteProduct = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
@@ -126,6 +133,12 @@ export default function ProductsPage() {
 
   const handleProductUpdated = () => {
     setSuccess('Product updated successfully!');
+    fetchProducts(); // Refresh the list
+    setTimeout(() => setSuccess(''), 3000);
+  };
+
+  const handleStockUpdated = () => {
+    setSuccess('Stock updated successfully!');
     fetchProducts(); // Refresh the list
     setTimeout(() => setSuccess(''), 3000);
   };
@@ -234,7 +247,7 @@ export default function ProductsPage() {
                     <TableCell align="right">KES {product.wholesale_price}</TableCell>
                     <TableCell align="center">
                       <Box display="flex" alignItems="center" justifyContent="center" gap={1}>
-                        <Typography>{product.current_stock}</Typography>
+                        <Typography fontWeight="bold">{product.current_stock}</Typography>
                         <Chip
                           label={stockStatus.label}
                           color={stockStatus.color}
@@ -243,7 +256,7 @@ export default function ProductsPage() {
                       </Box>
                     </TableCell>
                     <TableCell align="center">
-                      <Tooltip title="Edit">
+                      <Tooltip title="Edit Product">
                         <IconButton
                           size="small"
                           color="primary"
@@ -253,11 +266,15 @@ export default function ProductsPage() {
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Manage Stock">
-                        <IconButton size="small" color="info">
+                        <IconButton 
+                          size="small" 
+                          color="info"
+                          onClick={() => handleManageStock(product)}
+                        >
                           <Inventory />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title="Delete">
+                      <Tooltip title="Delete Product">
                         <IconButton
                           size="small"
                           color="error"
@@ -308,6 +325,17 @@ export default function ProductsPage() {
           setSelectedProduct(null);
         }}
         onSuccess={handleProductUpdated}
+      />
+
+      {/* Stock Management Dialog */}
+      <StockManagementDialog
+        open={stockDialogOpen}
+        product={selectedProduct}
+        onClose={() => {
+          setStockDialogOpen(false);
+          setSelectedProduct(null);
+        }}
+        onSuccess={handleStockUpdated}
       />
     </Box>
   );

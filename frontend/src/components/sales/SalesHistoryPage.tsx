@@ -16,18 +16,25 @@ import {
   InputAdornment,
   TablePagination,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import {
   Visibility,
   Search,
   Print,
   Refresh,
+  Close,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { salesService, type Sale } from '../../services/salesService';
 import LoadingSpinner from '../../components/common/LoadingSpinner';
+import InvoiceDialog from '../../components/sales/InvoiceDialog';
 
 export default function SalesHistory() {
   const [sales, setSales] = useState<Sale[]>([]);
@@ -38,6 +45,14 @@ export default function SalesHistory() {
   const [dateFilter, setDateFilter] = useState<Date | null>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  
+  // Sale details dialog
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
+  
+  // Invoice dialog
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [invoiceData, setInvoiceData] = useState<any>(null);
 
   const fetchSales = async () => {
     try {
@@ -45,7 +60,6 @@ export default function SalesHistory() {
       setError('');
       console.log('🔄 Loading sales history from API...');
 
-      // ✅ Real API call instead of mock data
       const response = await salesService.getSales();
       console.log('✅ Sales history loaded:', response);
 
@@ -55,7 +69,6 @@ export default function SalesHistory() {
       console.error('❌ Failed to load sales history:', err);
       setError(err.message || 'Failed to load sales history');
       
-      // Clear sales on error
       setSales([]);
       setFilteredSales([]);
     } finally {
@@ -96,6 +109,33 @@ export default function SalesHistory() {
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  const handleViewDetails = (sale: Sale) => {
+    setSelectedSale(sale);
+    setDetailsDialogOpen(true);
+  };
+
+  const handlePrintInvoice = (sale: Sale) => {
+    // Create invoice data for printing
+    const invoice = {
+      invoice_number: sale.invoice_number,
+      date: new Date(sale.created_at).toLocaleString(),
+      sale_type: sale.sale_type,
+      items: [
+        {
+          product_name: `Sale Items (${sale.items_count} items)`,
+          quantity: sale.items_count,
+          unit_price: sale.total_amount / sale.items_count,
+          subtotal: sale.total_amount,
+        }
+      ],
+      total: sale.total_amount,
+      payment_method: sale.payment_method,
+    };
+    
+    setInvoiceData(invoice);
+    setInvoiceDialogOpen(true);
   };
 
   const getPaymentMethodChip = (method: string) => {
@@ -213,10 +253,7 @@ export default function SalesHistory() {
                       <IconButton 
                         size="small" 
                         color="primary"
-                        onClick={() => {
-                          // TODO: Implement view details functionality
-                          console.log('View sale details:', sale.id);
-                        }}
+                        onClick={() => handleViewDetails(sale)}
                       >
                         <Visibility />
                       </IconButton>
@@ -225,10 +262,7 @@ export default function SalesHistory() {
                       <IconButton 
                         size="small" 
                         color="default"
-                        onClick={() => {
-                          // TODO: Implement print functionality
-                          console.log('Print invoice:', sale.invoice_number);
-                        }}
+                        onClick={() => handlePrintInvoice(sale)}
                       >
                         <Print />
                       </IconButton>
@@ -260,6 +294,74 @@ export default function SalesHistory() {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       </TableContainer>
+
+      {/* Sale Details Dialog */}
+      <Dialog open={detailsDialogOpen} onClose={() => setDetailsDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          Sale Details - {selectedSale?.invoice_number}
+        </DialogTitle>
+        <DialogContent>
+          {selectedSale && (
+            <Box>
+              <Typography variant="h6" gutterBottom>Sale Information</Typography>
+              <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2} mb={3}>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Invoice Number:</Typography>
+                  <Typography fontWeight="bold">{selectedSale.invoice_number}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Date:</Typography>
+                  <Typography>{new Date(selectedSale.created_at).toLocaleString()}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Sale Type:</Typography>
+                  <Box mt={0.5}>
+                    {getSaleTypeChip(selectedSale.sale_type)}
+                  </Box>
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Payment Method:</Typography>
+                  <Box mt={0.5}>
+                    {getPaymentMethodChip(selectedSale.payment_method)}
+                  </Box>
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Total Items:</Typography>
+                  <Typography fontWeight="bold">{selectedSale.items_count}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">Total Amount:</Typography>
+                  <Typography fontWeight="bold" color="primary.main">
+                    KES {selectedSale.total_amount.toFixed(2)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDetailsDialogOpen(false)} startIcon={<Close />}>
+            Close
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<Print />}
+            onClick={() => {
+              setDetailsDialogOpen(false);
+              if (selectedSale) handlePrintInvoice(selectedSale);
+            }}
+          >
+            Print Invoice
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Invoice Dialog for Printing */}
+      <InvoiceDialog
+        open={invoiceDialogOpen}
+        onClose={() => setInvoiceDialogOpen(false)}
+        invoiceData={invoiceData}
+      />
     </Box>
   );
 }
