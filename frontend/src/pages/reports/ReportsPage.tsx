@@ -158,6 +158,7 @@ export default function ReportsPage() {
       ]);
 
       console.log('✅ Reports data loaded successfully');
+      console.log('📊 Top products received:', topProductsData);
 
       setSalesOverview(salesOverviewData);
       setSalesTrend(salesTrendData);
@@ -222,11 +223,11 @@ export default function ReportsPage() {
         </Tabs>
       </Paper>
 
-      {/* Sales Overview Tab - FIXED: Removed Target Achievement and Average Sales */}
+      {/* Sales Overview Tab */}
       <TabPanel value={tabValue} index={0}>
         {salesOverview && (
           <>
-            {/* Summary Cards - SIMPLIFIED */}
+            {/* Summary Cards */}
             <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3} mb={3}>
               <MetricCard
                 title="Total Sales"
@@ -234,10 +235,6 @@ export default function ReportsPage() {
                 subtitle={`${salesOverview.totalTransactions} transactions`}
                 explanation="Total revenue from all completed sales in your selected period. This includes both retail and wholesale sales."
               />
-              
-              {/* ❌ REMOVED: Average Sale card */}
-              
-              {/* ❌ REMOVED: Target Achievement card */}
               
               <MetricCard
                 title="Transactions"
@@ -247,7 +244,7 @@ export default function ReportsPage() {
               />
             </Box>
 
-            {/* Sales Trend Chart - Updated to remove target line */}
+            {/* Sales Trend Chart */}
             <Paper sx={{ p: 3 }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" gutterBottom>
@@ -271,7 +268,6 @@ export default function ReportsPage() {
                     strokeWidth={2}
                     name="Daily Sales"
                   />
-                  {/* ❌ REMOVED: Target line */}
                 </LineChart>
               </ResponsiveContainer>
               <Typography variant="caption" color="text.secondary" mt={2} display="block">
@@ -284,15 +280,6 @@ export default function ReportsPage() {
 
       {/* Product Performance Tab */}
       <TabPanel value={tabValue} index={1}>
-        <Alert severity="info" sx={{ mb: 3 }}>
-          <Typography variant="body2">
-            <strong>📊 Product Performance Metrics:</strong><br/>
-            • <strong>Units Sold:</strong> Actual number of units sold based on your sales data<br/>
-            • <strong>Revenue:</strong> Real revenue calculated from completed transactions<br/>
-            • <strong>Category Sales:</strong> Distribution of sales across different shoe categories
-          </Typography>
-        </Alert>
-
         <Box display="flex" flexWrap="wrap" gap={3}>
           {/* Category Distribution */}
           <Box flex="1 1 400px">
@@ -343,7 +330,7 @@ export default function ReportsPage() {
           </Box>
         </Box>
 
-        {/* Top Products Table */}
+        {/* Top Products Table - REMOVED MARGIN % COLUMN */}
         <Paper sx={{ p: 3, mt: 3 }}>
           <Typography variant="h6" gutterBottom>
             Top Selling Products
@@ -356,7 +343,8 @@ export default function ReportsPage() {
                   <th style={{ padding: '12px', textAlign: 'left' }}>Brand</th>
                   <th style={{ padding: '12px', textAlign: 'right' }}>Units Sold</th>
                   <th style={{ padding: '12px', textAlign: 'right' }}>Revenue</th>
-                  <th style={{ padding: '12px', textAlign: 'right' }}>Current Stock</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Actual Profit</th>
+                  <th style={{ padding: '12px', textAlign: 'right' }}>Stock</th>
                 </tr>
               </thead>
               <tbody>
@@ -366,12 +354,17 @@ export default function ReportsPage() {
                     <td style={{ padding: '12px' }}>{product.brand}</td>
                     <td style={{ padding: '12px', textAlign: 'right' }}>{product.unitsSold}</td>
                     <td style={{ padding: '12px', textAlign: 'right' }}>KES {product.revenue.toLocaleString()}</td>
+                    <td style={{ padding: '12px', textAlign: 'right' }}>
+                      <span style={{ color: (product.actual_profit || 0) > 0 ? '#10b981' : '#ef4444' }}>
+                        KES {(product.actual_profit || 0).toLocaleString()}
+                      </span>
+                    </td>
                     <td style={{ padding: '12px', textAlign: 'right' }}>{product.stock}</td>
                   </tr>
                 ))}
                 {topProducts.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: '#666' }}>
+                    <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#666' }}>
                       No product data available
                     </td>
                   </tr>
@@ -379,10 +372,23 @@ export default function ReportsPage() {
               </tbody>
             </table>
           </Box>
+          
+          {/* Debug Info */}
+          {topProducts.length === 0 && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                <strong>🔍 Debugging Info:</strong><br/>
+                • Open browser console (F12) and check for API calls to <code>/analytics/product-performance</code><br/>
+                • Verify you have sales data in your database<br/>
+                • Check backend logs for SQL query results<br/>
+                • Make sure your Nike Air Max sale was properly recorded in sale_items table
+              </Typography>
+            </Alert>
+          )}
         </Paper>
       </TabPanel>
 
-      {/* Inventory Analysis Tab - FIXED: Removed Stock Health */}
+      {/* Inventory Analysis Tab */}
       <TabPanel value={tabValue} index={2}>
         {inventoryAnalysis && (
           <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={3}>
@@ -408,8 +414,6 @@ export default function ReportsPage() {
               explanation="Number of products with zero stock. These represent lost sales opportunities and should be restocked immediately."
               color="error"
             />
-            
-            {/* ❌ REMOVED: Stock Health card */}
           </Box>
         )}
       </TabPanel>
@@ -421,7 +425,7 @@ export default function ReportsPage() {
             <Typography variant="h6" gutterBottom>
               Revenue & Profit Trend (Last 6 Months)
             </Typography>
-            <Tooltip title="Revenue is actual sales data. Profit is estimated at 30% of revenue (you can adjust this based on your actual profit margins)." arrow>
+            <Tooltip title="Revenue is actual sales data. Profit is calculated using real formula: (Selling Price - Purchase Price) × Quantity for each sale item." arrow>
               <Info sx={{ color: 'text.secondary', cursor: 'help' }} />
             </Tooltip>
           </Box>
@@ -444,16 +448,10 @@ export default function ReportsPage() {
                 dataKey="profit" 
                 stroke="#10b981" 
                 strokeWidth={2}
-                name="Estimated Profit (30%)"
+                name="Actual Profit"
               />
             </LineChart>
           </ResponsiveContainer>
-          <Typography variant="caption" color="text.secondary" mt={2} display="block">
-            💰 <strong>Financial Calculations:</strong><br/>
-            • <strong>Revenue:</strong> Your actual sales transactions from the database<br/>
-            • <strong>Profit:</strong> Estimated at 30% of revenue (adjust based on your actual margins)<br/>
-            • <strong>Calculation:</strong> Profit = Revenue × 0.30
-          </Typography>
         </Paper>
       </TabPanel>
     </Box>

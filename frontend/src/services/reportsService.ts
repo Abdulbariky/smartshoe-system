@@ -1,4 +1,4 @@
-// src/services/reportsService.ts - FIXED to use REAL backend data
+// src/services/reportsService.ts - COMPLETE with REAL profit calculations
 
 import { productService } from './productService';
 import { salesService } from './salesService';
@@ -6,18 +6,17 @@ import { salesService } from './salesService';
 export interface SalesOverviewData {
   totalSales: number;
   totalTransactions: number;
-  // ❌ REMOVED: averageSale and targetAchievement
 }
 
 export interface SalesTrendData {
   name: string;
   sales: number;
-  // ❌ REMOVED: target field
 }
 
 export interface CategoryData {
   name: string;
   value: number;
+  profit: number;
   color: string;
 }
 
@@ -25,12 +24,14 @@ export interface BrandPerformanceData {
   brand: string;
   sales: number;
   units: number;
+  profit: number;
 }
 
 export interface MonthlyTrendData {
   month: string;
   revenue: number;
   profit: number;
+  profit_margin: number;
 }
 
 export interface TopProductData {
@@ -38,6 +39,8 @@ export interface TopProductData {
   brand: string;
   unitsSold: number;
   revenue: number;
+  actual_profit: number;
+  profit_margin: number;
   stock: number;
 }
 
@@ -46,7 +49,6 @@ export interface InventoryAnalysisData {
   lowStockItems: number;
   outOfStockItems: number;
   totalItems: number;
-  // ❌ REMOVED: stockHealth
 }
 
 function getAuthHeaders(): Record<string, string> {
@@ -64,7 +66,6 @@ export const reportsService = {
     try {
       console.log('🔄 Reports: Loading REAL sales overview data...');
       
-      // Get real sales data directly
       const salesData = await salesService.getSales();
       const sales = salesData.sales || [];
       
@@ -75,7 +76,6 @@ export const reportsService = {
       return {
         totalSales,
         totalTransactions,
-        // ❌ REMOVED: averageSale and targetAchievement
       };
     } catch (error) {
       console.error('❌ Reports: Failed to load sales overview:', error);
@@ -88,13 +88,29 @@ export const reportsService = {
 
   getSalesTrend: async (): Promise<SalesTrendData[]> => {
     try {
-      console.log('🔄 Reports: Loading REAL sales trend data...');
+      console.log('🔄 Reports: Loading REAL sales trend...');
       
-      // Get actual sales data
+      const response = await fetch(`${SALES_API_URL}/analytics/sales-trend`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.trend) {
+          console.log('✅ Reports: Using backend sales trend data');
+          return data.trend.map((item: any) => ({
+            name: item.name,
+            sales: item.sales,
+          }));
+        }
+      }
+      
+      // Fallback to previous method if backend endpoint unavailable
+      console.log('🔄 Reports: Using fallback sales trend calculation');
       const salesData = await salesService.getSales();
       const sales = salesData.sales || [];
       
-      // Generate last 7 days trend based on REAL sales
       const last7Days = [];
       const today = new Date();
       
@@ -105,7 +121,6 @@ export const reportsService = {
         const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
         const dayString = date.toDateString();
         
-        // Calculate REAL sales for this day from actual backend data
         const daySales = sales
           .filter((sale) => {
             const saleDate = new Date(sale.created_at);
@@ -116,7 +131,6 @@ export const reportsService = {
         last7Days.push({
           name: dayName,
           sales: daySales,
-          // ❌ REMOVED: target field
         });
       }
       
@@ -132,24 +146,20 @@ export const reportsService = {
     try {
       console.log('🔄 Reports: Loading REAL category analysis...');
       
-      // Try to get real category data from backend analytics
-      try {
-        const response = await fetch(`${SALES_API_URL}/analytics/overview`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
+      const response = await fetch(`${SALES_API_URL}/analytics/category-performance`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.categories) {
-            console.log('✅ Reports: Using REAL backend category data');
-            return data.categories;
-          }
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.categories) {
+          console.log('✅ Reports: Using REAL backend category data with profit');
+          return data.categories;
         }
-      } catch (error) {
-        console.log('⚠️ Reports: Backend category analytics unavailable');
       }
       
+      // Fallback method
       console.log('🔄 Reports: Using product distribution fallback');
       const products = await productService.getAll();
       const salesData = await salesService.getSales();
@@ -158,7 +168,6 @@ export const reportsService = {
       const categoryMap = new Map<string, number>();
       const colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d'];
       
-      // Distribute sales proportionally across categories
       const categoryCount = new Map<string, number>();
       products.forEach(product => {
         const category = product.category;
@@ -178,6 +187,7 @@ export const reportsService = {
         categoryData.push({
           name: category,
           value: Math.round(value),
+          profit: Math.round(value * 0.2), // Rough estimate for fallback
           color: colors[colorIndex % colors.length],
         });
         colorIndex++;
@@ -194,22 +204,17 @@ export const reportsService = {
     try {
       console.log('🔄 Reports: Loading REAL brand performance...');
       
-      // Try to get real brand data from backend analytics
-      try {
-        const response = await fetch(`${SALES_API_URL}/analytics/overview`, {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
+      const response = await fetch(`${SALES_API_URL}/analytics/brand-performance`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.brands) {
-            console.log('✅ Reports: Using REAL backend brand data');
-            return data.brands;
-          }
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.brands) {
+          console.log('✅ Reports: Using REAL backend brand data with profit');
+          return data.brands;
         }
-      } catch (error) {
-        console.log('⚠️ Reports: Backend brand analytics unavailable');
       }
       
       return [];
@@ -219,10 +224,9 @@ export const reportsService = {
     }
   },
 
-  // 🔧 FIXED: Top products now uses REAL backend analytics
   getTopProducts: async (): Promise<TopProductData[]> => {
     try {
-      console.log('🔄 Reports: Loading REAL top products from backend...');
+      console.log('🔄 Reports: Loading REAL top products with profit...');
       
       const response = await fetch(`${SALES_API_URL}/analytics/product-performance`, {
         method: 'GET',
@@ -232,22 +236,23 @@ export const reportsService = {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.products) {
-          console.log('✅ Reports: Using REAL backend product performance data');
-          console.log('📊 First 3 products from backend:', data.products.slice(0, 3));
+          console.log('✅ Reports: Using REAL backend product performance data with profit');
+          console.log('📊 Products received:', data.products);
           
-          // Map backend data to frontend format
           return data.products.map((product: any) => ({
             name: product.name,
             brand: product.brand,
-            unitsSold: Number(product.units_sold) || 0,  // ✅ REAL units sold
-            revenue: Number(product.revenue) || 0,        // ✅ REAL revenue
+            unitsSold: Number(product.units_sold) || 0,
+            revenue: Number(product.revenue) || 0,
+            actual_profit: Number(product.actual_profit) || 0,
+            profit_margin: Number(product.profit_margin) || 0,
             stock: Number(product.stock) || 0,
           }));
         } else {
-          console.log('⚠️ Backend returned unsuccessful response:', data);
+          console.log('⚠️ Backend returned no products or unsuccessful response');
         }
       } else {
-        console.log(`⚠️ Backend request failed: ${response.status}`);
+        console.log(`⚠️ Backend request failed with status: ${response.status}`);
       }
       
       console.log('🔄 Reports: Backend unavailable, returning empty array');
@@ -260,12 +265,26 @@ export const reportsService = {
 
   getMonthlyTrend: async (): Promise<MonthlyTrendData[]> => {
     try {
-      console.log('🔄 Reports: Loading REAL monthly trend...');
+      console.log('🔄 Reports: Loading REAL monthly trend with profit...');
       
+      const response = await fetch(`${SALES_API_URL}/analytics/monthly-trend`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.monthly_trend) {
+          console.log('✅ Reports: Using REAL backend monthly trend with profit calculations');
+          return data.monthly_trend;
+        }
+      }
+      
+      // Fallback
+      console.log('🔄 Reports: Using fallback monthly trend calculation');
       const salesData = await salesService.getSales();
       const sales = salesData.sales || [];
       
-      // Generate last 6 months trend based on REAL sales
       const months = [];
       const today = new Date();
       
@@ -283,16 +302,17 @@ export const reportsService = {
           .reduce((sum, sale) => sum + Number(sale.total_amount), 0);
         
         const revenue = monthSales;
-        const profit = revenue * 0.3; // Assume 30% profit margin
+        const profit = revenue * 0.2; // Conservative estimate
         
         months.push({
           month: monthName,
           revenue: Math.round(revenue),
           profit: Math.round(profit),
+          profit_margin: revenue > 0 ? (profit / revenue * 100) : 0,
         });
       }
       
-      console.log('✅ Reports: Generated monthly trend from REAL sales data');
+      console.log('⚠️ Reports: Using fallback monthly trend');
       return months;
     } catch (error) {
       console.error('❌ Reports: Failed to load monthly trend:', error);
@@ -317,7 +337,6 @@ export const reportsService = {
         lowStockItems,
         outOfStockItems,
         totalItems,
-        // ❌ REMOVED: stockHealth
       };
     } catch (error) {
       console.error('❌ Reports: Failed to load inventory analysis:', error);
@@ -327,6 +346,30 @@ export const reportsService = {
         outOfStockItems: 0,
         totalItems: 0,
       };
+    }
+  },
+
+  getProfitSummary: async () => {
+    try {
+      console.log('🔄 Reports: Loading profit summary...');
+      
+      const response = await fetch(`${SALES_API_URL}/analytics/profit-summary`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.profit_summary) {
+          console.log('✅ Reports: Got real profit summary');
+          return data.profit_summary;
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('❌ Reports: Failed to load profit summary:', error);
+      return null;
     }
   },
 };

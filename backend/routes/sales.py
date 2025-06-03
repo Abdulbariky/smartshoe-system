@@ -218,3 +218,267 @@ def get_sales_trend():
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)}), 500
+
+# ✅ FIXED: Product Performance with Real Profit
+@sales_bp.route('/analytics/product-performance', methods=['GET'])
+@jwt_required()
+def get_product_performance():
+    try:
+        print("📊 Getting product performance with REAL profit...")
+        
+        # Get products with sales data
+        query = """
+        SELECT 
+            p.id,
+            p.name,
+            p.brand,
+            p.purchase_price,
+            COALESCE(SUM(si.quantity), 0) as units_sold,
+            COALESCE(SUM(si.quantity * si.unit_price), 0) as revenue,
+            COALESCE(SUM(si.quantity * (si.unit_price - p.purchase_price)), 0) as actual_profit
+        FROM products p
+        LEFT JOIN sale_items si ON p.id = si.product_id
+        LEFT JOIN sales s ON si.sale_id = s.id
+        GROUP BY p.id, p.name, p.brand, p.purchase_price
+        HAVING COALESCE(SUM(si.quantity), 0) > 0
+        ORDER BY units_sold DESC
+        LIMIT 20
+        """
+        
+        result = db.session.execute(db.text(query))
+        products = []
+        
+        for row in result:
+            # Calculate current stock for this product using the same method as Product.get_current_stock()
+            total_in = db.session.query(db.func.sum(InventoryItem.quantity)).filter_by(
+                product_id=row.id, 
+                transaction_type='in'
+            ).scalar() or 0
+            
+            total_out = db.session.query(db.func.sum(InventoryItem.quantity)).filter_by(
+                product_id=row.id, 
+                transaction_type='out'
+            ).scalar() or 0
+            
+            current_stock = total_in - total_out
+            
+            product_data = {
+                'id': row.id,
+                'name': row.name,
+                'brand': row.brand,
+                'units_sold': int(row.units_sold),
+                'revenue': float(row.revenue),
+                'actual_profit': float(row.actual_profit),  # ✅ Fixed: using 'actual_profit'
+                'stock': int(current_stock),
+                'profit_margin': round((row.actual_profit / row.revenue * 100), 2) if row.revenue > 0 else 0
+            }
+            products.append(product_data)
+            print(f"📦 Product: {row.name} - Units: {row.units_sold}, Revenue: {row.revenue}, Profit: {row.actual_profit}")
+        
+        print(f"✅ Found {len(products)} products with sales data")
+        return jsonify({'success': True, 'products': products}), 200
+        
+    except Exception as e:
+        print(f"❌ Error getting product performance: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@sales_bp.route('/analytics/monthly-trend', methods=['GET'])
+@jwt_required()
+def get_monthly_trend():
+    """Get monthly revenue and REAL profit trend (last 6 months)"""
+    try:
+        print("📊 Getting monthly trend with REAL profit...")
+        
+        monthly_data = []
+        today = datetime.now(nairobi_tz).date()
+        
+        for i in range(5, -1, -1):  # Last 6 months
+            # Calculate start and end of month
+            if i == 0:
+                month_start = today.replace(day=1)
+                if today.month == 12:
+                    month_end = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+                else:
+                    month_end = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+            else:
+                # Go back i months
+                year = today.year
+                month = today.month - i
+                if month <= 0:
+                    month += 12
+                    year -= 1
+                month_start = datetime(year, month, 1).date()
+                if month == 12:
+                    month_end = datetime(year + 1, 1, 1).date() - timedelta(days=1)
+                else:
+                    month_end = datetime(year, month + 1, 1).date() - timedelta(days=1)
+            
+            # Query for real profit calculation
+            query = """
+            SELECT 
+                COALESCE(SUM(si.quantity * si.unit_price), 0) as revenue,
+                COALESCE(SUM(si.quantity * (si.unit_price - p.purchase_price)), 0) as actual_profit
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            JOIN products p ON si.product_id = p.id
+            WHERE DATE(s.created_at) >= :start_date AND DATE(s.created_at) <= :end_date
+            """
+            
+            result = db.session.execute(db.text(query), {
+                'start_date': month_start,
+                'end_date': month_end
+            }).fetchone()
+            
+            revenue = float(result.revenue) if result.revenue else 0
+            actual_profit = float(result.actual_profit) if result.actual_profit else 0
+            
+            monthly_data.append({
+                'month': month_start.strftime('%b'),
+                'revenue': revenue,
+                'profit': actual_profit,  # ✅ REAL profit, not 30% estimate
+                'profit_margin': (actual_profit / revenue * 100) if revenue > 0 else 0
+            })
+        
+        print("✅ Generated monthly trend with REAL profit calculations")
+        return jsonify({
+            'success': True,
+            'monthly_trend': monthly_data
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error getting monthly trend: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@sales_bp.route('/analytics/profit-summary', methods=['GET'])
+@jwt_required()
+def get_profit_summary():
+    """Get overall profit summary with real calculations"""
+    try:
+        print("📊 Getting profit summary...")
+        
+        # Calculate total real profit
+        query = """
+        SELECT 
+            COALESCE(SUM(si.quantity * si.unit_price), 0) as total_revenue,
+            COALESCE(SUM(si.quantity * p.purchase_price), 0) as total_cost,
+            COALESCE(SUM(si.quantity * (si.unit_price - p.purchase_price)), 0) as total_profit
+        FROM sale_items si
+        JOIN products p ON si.product_id = p.id
+        JOIN sales s ON si.sale_id = s.id
+        """
+        
+        result = db.session.execute(db.text(query)).fetchone()
+        
+        total_revenue = float(result.total_revenue) if result.total_revenue else 0
+        total_cost = float(result.total_cost) if result.total_cost else 0
+        total_profit = float(result.total_profit) if result.total_profit else 0
+        profit_margin = (total_profit / total_revenue * 100) if total_revenue > 0 else 0
+        
+        return jsonify({
+            'success': True,
+            'profit_summary': {
+                'total_revenue': total_revenue,
+                'total_cost': total_cost,
+                'total_profit': total_profit,
+                'profit_margin': profit_margin
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error getting profit summary: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@sales_bp.route('/analytics/category-performance', methods=['GET'])
+@jwt_required()
+def get_category_performance():
+    """Get category performance with real profit"""
+    try:
+        print("📊 Getting category performance...")
+        
+        query = """
+        SELECT 
+            p.category,
+            COALESCE(SUM(si.quantity * si.unit_price), 0) as revenue,
+            COALESCE(SUM(si.quantity * (si.unit_price - p.purchase_price)), 0) as profit,
+            COALESCE(SUM(si.quantity), 0) as units_sold
+        FROM products p
+        LEFT JOIN sale_items si ON p.id = si.product_id
+        LEFT JOIN sales s ON si.sale_id = s.id
+        GROUP BY p.category
+        HAVING COALESCE(SUM(si.quantity), 0) > 0
+        ORDER BY revenue DESC
+        """
+        
+        result = db.session.execute(db.text(query))
+        categories = []
+        colors = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82ca9d']
+        
+        for i, row in enumerate(result):
+            categories.append({
+                'name': row.category,
+                'value': float(row.revenue),
+                'profit': float(row.profit),
+                'units_sold': int(row.units_sold),
+                'color': colors[i % len(colors)]
+            })
+        
+        return jsonify({
+            'success': True,
+            'categories': categories
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error getting category performance: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@sales_bp.route('/analytics/brand-performance', methods=['GET'])
+@jwt_required()
+def get_brand_performance():
+    """Get brand performance with real profit"""
+    try:
+        print("📊 Getting brand performance...")
+        
+        query = """
+        SELECT 
+            p.brand,
+            COALESCE(SUM(si.quantity * si.unit_price), 0) as sales,
+            COALESCE(SUM(si.quantity), 0) as units,
+            COALESCE(SUM(si.quantity * (si.unit_price - p.purchase_price)), 0) as profit
+        FROM products p
+        LEFT JOIN sale_items si ON p.id = si.product_id
+        LEFT JOIN sales s ON si.sale_id = s.id
+        GROUP BY p.brand
+        HAVING COALESCE(SUM(si.quantity), 0) > 0
+        ORDER BY sales DESC
+        LIMIT 10
+        """
+        
+        result = db.session.execute(db.text(query))
+        brands = []
+        
+        for row in result:
+            brands.append({
+                'brand': row.brand,
+                'sales': float(row.sales),
+                'units': int(row.units),
+                'profit': float(row.profit)
+            })
+        
+        return jsonify({
+            'success': True,
+            'brands': brands
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error getting brand performance: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
