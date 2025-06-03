@@ -50,20 +50,24 @@ const formatDateTime = (dateString: string | undefined | null): string => {
   if (!dateString) return 'Invalid Date';
 
   try {
-    const date = new Date(dateString);
+    // Backend sends UTC timestamps without 'Z', so we treat them as UTC
+    let date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Invalid Date';
 
-    // Format for Kenya locale with proper time
-    return date.toLocaleString('en-KE', {
+    // Since backend stores UTC time but doesn't include 'Z', we manually add 3 hours for Nairobi time
+    const nairobiTime = new Date(date.getTime() + (3 * 60 * 60 * 1000));
+
+    // Format the Nairobi time
+    return nairobiTime.toLocaleString('en-KE', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-      hour12: true,
-      timeZone: 'Africa/Nairobi'
+      hour12: true
     });
   } catch (error) {
+    console.error('Date formatting error:', error);
     return 'Invalid Date';
   }
 };
